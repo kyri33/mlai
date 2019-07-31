@@ -12,7 +12,10 @@ def getwordcounts(url):
         if 'summary' in e:
             summary = e.summary
         else:
-            summary = e.description
+            try:
+                summary = e.description
+            except:
+                continue
         words = getwords(e.title + ' ' + summary)
         for word in words:
             wc.setdefault(word, 0)
@@ -45,7 +48,7 @@ for w,bc in apcount.items():
     frac = float(bc) / feedcount
     if frac > 0.1 and frac < 0.5: wordlist.append(w)
 
-out = open('blogdata.txt', w)
+out = open('blogdata.txt', 'w')
 out.write('Blog')
 for word in wordlist:
     out.write('\t%s' %  word)
