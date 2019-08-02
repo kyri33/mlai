@@ -1,4 +1,5 @@
 from math import sqrt
+from PIL import Image, ImageDraw
 
 def readfile(filename):
     lines = [line for line in open(filename)]
@@ -23,19 +24,19 @@ def pearson(v1, v2):
     # pearson score
     num = pSum - (sum1 * sum2 / len(v1))
     den = sqrt((sum1Sq - pow(sum1, 2)/len(v1)) * (sum2Sq - pow(sum2, 2) / len(v1)))
-    if dn == 0: return 0
+    if den == 0: return 0
     
     return 1.0 - num/den
 
 class bicluster:
     def __init__(self, vec, left=None, right=None, distance=0.0, id=None):
         self.left = left
-        sleft.right = right
-        slef.vec = vec
+        self.right = right
+        self.vec = vec
         self.id = id
         self.distance = distance
     
-def gcluster(rows, distance=pearson):
+def hcluster(rows, distance=pearson):
     distances = {}
     currentclustid = -1
 
@@ -53,3 +54,61 @@ def gcluster(rows, distance=pearson):
                 if d < closest:
                     closest = d
                     lowestpair = (i, j)
+        mergevec = [(clust[lowestpair[0]].vec[i] + clust[lowestpair[1]].vec[i]) / 2.0 for i in range(len(clust[0].vec))]
+        newcluster = bicluster(mergevec, left = clust[lowestpair[0]], right = clust[lowestpair[1]], distance = closest, id = currentclustid)
+        del clust[lowestpair[1]]
+        del clust[lowestpair[0]]
+        clust.append(newcluster)
+    return clust[0]
+
+def printclust(clust, labels=None, n=0):
+    for i in range(n): print('  ', end = '')
+    if clust.id < 0:
+        print('-')
+    else:
+        if labels == None: print(clust.id)
+        else: print(labels[clust.id])
+    
+    if clust.left != None: printclust(clust.left, labels=labels, n = n+1)
+    if clust.right != None: printclust(clust.right, labels=labels, n = n+1)
+
+def getheight(clust):
+    if clust.left == None and clust.right == None: return 1
+    
+    return getheight(clust.left) + getheight(clust.right)
+
+def getdepth(clust):
+    if clust.left == None and clust.right == None: return 0
+    
+    return max(getdepth(clust.left), getdepth(clust.right)) + clust.distance
+
+def drawdendogram(clust, labels, jpeg='clusters.jpg'):
+    h = getheight(clust) * 20
+    w = 1200
+    depth = getdepth(clust)
+    scaling = float(w - 150) / depth
+    img = Image.new('RGB', (w,h), (255,255,255))
+    draw = ImageDraw.Draw(img)
+    draw.line((0, h/2,10,h/2), fill=(255,0,0))
+    drawnode(draw,clust,10,(h/2), scaling, labels)
+    img.save(jpeg, 'JPEG')
+
+def drawnode(draw, clust, x, y, scaling, labels):
+    if clust.id < 0:
+        h1 = getheight(clust.left) * 20
+        h2 = getheight(clust.right) * 20
+        top = y- (h1 + h2) / 2
+        bottom = y+(h1+h2)/2
+        ll = clust.distance * scaling
+        draw.line((x, top+h1/2,x,bottom-h2/2), fill=(255,0,0))
+        draw.line((x, top+h1/2, x+ll, top+h1/2), fill=(255,0,0))
+        draw.line((x, bottom-h2/2, x+ll, bottom-h2/2), fill=(255,0,0))
+        drawnode(draw, clust.left, x+ll, top+h1/2,scaling,labels)
+        drawnode(draw, clust.right, x+ll, bottom-h2/2,scaling,labels)
+    else:
+        draw.text((x+5,y-7), labels[clust.id].encode("utf-8"), (0,0,0))
+
+blogs,words,data = readfile('blogdata.txt')
+cluster = hcluster(data)
+# printclust(cluster, labels=blogs)
+drawdendogram(cluster, blogs)
