@@ -8,7 +8,7 @@ n_hidden2 = 100
 n_outputs = 10
 
 X = tf.placeholder(tf.float32, shape=(None, n_inputs), name="X")
-y = tf.placeholder(tf.int64, shape=(None, 1), name="y")
+y = tf.placeholder(tf.int64, shape=(None), name="y")
 
 # Manually creating a neuron layer
 
@@ -51,3 +51,26 @@ learning_rate = 0.01
 with tf.name_scope("train"):
     optimizer = tf.train.GradientDescentOptimizer(learning_rate)
     training_op = optimizer.minimize(loss)
+
+with tf.name_scope("eval"):
+    correct = tf.nn.in_top_k(logits, y, 1)
+    accuracy = tf.reduce_mean(tf.cast(correct, tf.float32))
+
+init = tf.global_variables_initializer()
+
+from tensorflow.examples.tutorials.mnist import input_data
+mnist = input_data.read_data_sets("/tmp/data/")
+
+n_epochs = 40
+batch_size = 50
+
+with tf.Session() as sess:
+    init.run()
+    for epoch in range(n_epochs):
+        for iteration in range(mnist.train.num_examples // batch_size):
+            X_batch, y_batch = mnist.train.next_batch(batch_size)
+            sess.run(training_op, feed_dict = {X: X_batch, y: y_batch})
+        acc_train = accuracy.eval(feed_dict={X: X_batch, y: y_batch})
+        acc_test = accuracy.eval(feed_dict = {X: mnist.test.images, 
+                                    y: mnist.test.labels})
+        print(epoch, "Train accuracy", acc_train, "test accuracy", acc_test)
