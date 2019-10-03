@@ -40,7 +40,7 @@ num_inputs = 1
 num_neurons = 100
 num_outputs = 1
 learning_rate = 0.001
-num_iter = 5000
+num_iter = 2000
 batch_size = 1
 
 x = tf.placeholder(tf.float32, [None, num_time_steps, num_inputs])
@@ -55,3 +55,33 @@ optimizer = tf.train.AdamOptimizer(learning_rate = learning_rate)
 train = optimizer.minimize(loss)
 
 init = tf.global_variables_initializer()
+
+test_inst = np.linspace(5, 5 + ts_data.resolution * (num_time_steps + 1), num_time_steps + 1)
+x_new = np.sin(np.array(test_inst[:-1].reshape(-1, num_time_steps, num_inputs)))
+
+with tf.Session() as sess:
+    sess.run(init)
+
+    for iter in range(num_iter):
+        x_batch, y_batch = ts_data.next_batch(batch_size, num_time_steps)
+        sess.run(train, feed_dict = {x: x_batch, y: y_batch})
+        if iter % 100 == 0:
+            mse = loss.eval(feed_dict = {x: x_batch, y: y_batch})
+            print(iter, "\tMSE", mse)
+    y_pred = sess.run(outputs, feed_dict = {x: x_new})
+
+plt.title("TESTING THE MODEL")
+
+# TESTING INSTANCE
+plt.plot(test_inst[:-1], np.sin(test_inst[:-1]), "bo", markersize=15,alpha=0.5, label="TEST INST")
+
+# TARGET TO PREDICT
+plt.plot(test_inst[1:],np.sin(test_inst[1:]),"ko",markersize=8,label="TARGET")
+
+# MODEL PREDICTION
+plt.plot(test_inst[1:], y_pred[0,:,0], "r.",markersize=7,label="PREDICTIONS")
+
+plt.xlabel('TIME')
+plt.legend()
+plt.tight_layout()
+plt.show()
