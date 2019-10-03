@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 data = pd.read_csv("datasets/jse/quotes.csv", sep=";")
-
+# Hello motto
 def clean_commas(arr):
     return [float(val.replace(',', '.')) for val in arr]
 
