@@ -56,4 +56,30 @@ tf.reset_default_graph()
 train_inputs, train_outputs = [], []
 # Input and output placeholders unrolled over time for each step ?
 
-for ui in range()
+for ui in range(num_unrollings):
+    train_inputs.append(tf.placeholder(tf.float32, shape=[batch_size, D],name='train_inputs_%d'%ui))
+    train_outputs.append(tf.placeholder(tf.float32, shape=[batch_size, 1], name='train_outputs_%d'%ui))
+
+lstm_cells = [tf.contrib.rnn.LSTMCell(num_units=num_nodes[li], 
+                                    state_is_tuple=True,
+                                    initializer=tf.contrib.layers.xavier_initializer())
+            for li in range (n_layers)]
+
+drop_lstm_cells = [tf.contrib.rnn.DropoutWrapper(
+    lstm, input_keep_prob=1.0,output_keep_prob=1.0-dropout, state_keep_prob=1.0-dropout)
+    for lstm in lstm_cells]
+
+drop_multi_cell = tf.contrib.rnn.MultiRNNCell(drop_lstm_cells)
+multi_cell = tf.contrib.rnn.MultiRNNCell(lstm_cells)
+
+# Weight and bias vectors for linear regression of output
+w = tf.get_variable('w', shape=[num_nodes[-1], 1], initializer=tf.contrib.layers.xavier_initializer())
+b = tf.get_variable('b', initializer = tf.random_uniform([1], -0.1, 0.1))
+
+# Cell state and hidden state variables to maintain state of lstm
+c, h = [], []
+initial_state = []
+for li in range(n_layers):
+    c.append(tf.Variable(tf.zeros([batch_size, num_nodes[li]]), trainable=False))
+    h.append(tf.Variable(tf.zeros([batch_size, num_nodes]), trainable=False))
+    initial_state.append(tf.contrib.rnn.LSTMStateTuple(c[li], h[li]))
