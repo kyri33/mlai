@@ -1,4 +1,4 @@
-import numpy as numpy
+import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -42,6 +42,57 @@ for di in range(0, x_train.shape[0], smoothing_window_size):
 # x_train[di + smoothing_window_size:, :] = scaler.transform(x_train[di+smoothing_window_size:, :])
 x_test = scaler.transform(x_test)
 
+# DATA GENERATION OF BATCHES
+class DataGeneratorSeq(object):
+
+    def __init__(self, prices, batch_size, num_unroll):
+        self._prices = prices
+        self._prices_length = len(self._prices) - num_unroll
+        self._batch_size = batch_size
+        self._num_unroll = num_unroll
+        self._segments = self._prices_length // self._batch_size
+        self._cursor = [offset * self._segments for offset in range(self._batch_size)]
+
+    def next_batch(self):
+        batch_data = np.zeros((self._batch_size), dtype=np.float32)
+        batch_labels = np.zeros((self._batch_size), dtype=np.float32)
+
+        for b in range(self._batch_size):
+            if self._cursor[b]+1>=self._prices_length:
+                self._cursor[b] = np.random.randint(0, (b + 1)*self._segments)
+            
+            batch_data[b] = self._prices[self._cursor[b]]
+            batch_labels[b] = self._prices(self._cursor[b]+np.random.randint(1, 5))
+
+            self._cursor[b] = (self._cursor[b]+1)%self._prices_length
+        
+        return batch_data, batch_labels
+
+    def unroll_batches(self):
+        
+        unroll_data, unroll_labels = [],[]
+        init_data, init_label = None, None
+        for ui in range(self._num_unroll):
+            data, labels = self.next_batch()
+
+            unroll_data.append(data)
+            unroll_labels.append(labels)
+    
+    def reset_indices(self):
+        for b in range(self._batch_size):
+            self._cursor[b] = np.random.randint(0, min((b+1)* self._segments, self._prices_length-1))
+
+
+dg = DataGeneratorSeq(x_train, 5, 5)
+u_data, u_labels = dg.unroll_batches()
+for ui,(dat, lbl) in enumerate(zip(u_data, u_labels)):
+    print("\n\nUnrolled index %d"%ui)
+    dat_ind = dat
+    lbl_ind = lbl
+    print('\tINputs: ', dat)
+    print('\n\tOutput:',lbl)
+            
+
 # HYPER PARAMETERS
 
 D = 5 # Dimensionality of the data
@@ -83,3 +134,49 @@ for li in range(n_layers):
     c.append(tf.Variable(tf.zeros([batch_size, num_nodes[li]]), trainable=False))
     h.append(tf.Variable(tf.zeros([batch_size, num_nodes]), trainable=False))
     initial_state.append(tf.contrib.rnn.LSTMStateTuple(c[li], h[li]))
+
+# Transform data into shape [num_unrollings, batch_size(timesteps), inputs]
+
+all_inputs = tf.concat([tf.expand_dims(t, 0) for t in train_inputs], axis=0)
+
+# All outputs is [seq_length, batch_size, num_nodes]
+all_lstm_outputs, state = tf.nn.dynamic_rnn(
+    drop_multi_cell, all_inputs, initial_state=tuple(initial_state),
+    time_major = True, dtype=tf.float32
+)
+
+# Reshape outputs
+all_lstm_outputs = tf.reshape(all_lstm_output, [batch_size * num_unrollings, num_nodes[-1]])
+
+# Apply linear regression
+all_outputs = tf.nn.xw_plus_b(all_lstm_outputs, w, b)
+
+split_outputs = tf.split(all_outputs, num_unrollings, axis=0)
+
+# Calculating loss, note that error is summed and not averaged ?
+print("Defining training Loss")
+loss = 0.0
+with tf.control_dependencies([tf.assign(c[li], state[li][0]) for li in range(n_layers)] +
+                            [tf.assign(h[li], state[li][1]) for li in range(n_layers)]):
+    for ui in range(num_unrollings):
+        loss += tf.reduce_mean(0.5*(split_outputs[ui] - train_outputs[ui])**2)
+
+print("Learning rate decay operations")
+global_step = tf.Variable(0, trainable=False)
+inc_gstep = tf.assign(global_step, global_step+1)
+tf_learning_rate = tf.placeholder(shape=None, dtype=tf.float32)
+tf_min_learning_rate = tf.placeholder(shape=None, dtype=tf.float32)
+
+learning_rate = tf.maximum(
+    tf.train.exponential_decay(tf_learning_rate, global_step, decay_steps=1,decay_rate=0.5,staircase=True),
+    tf_min_learning_rate
+)
+
+# Optimizer
+print('TF Optimization operations')
+optimizer = tf.train.AdamOptimizer(learning_rate)
+gradients, v = zip(*optimizer.compute_gradients(loss))
+gradients, _ = tf.clip_by_global_norm(gradients, 5.0)
+optimizer = optimizer.apply_gradients(zip(gradients, v))
+
+print("\tAll done")
