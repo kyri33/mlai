@@ -26,7 +26,8 @@ d_train, d_test = train_test_split(data, train_size = 0.8, test_size = 0.2, shuf
 x_train = d_train.loc[:, train_cols].values
 x_test = d_test.loc[:, train_cols].values
 
-print(x_test.shape)
+print(x_train.shape)
+print(x_train.reshape(-1).shape)
 
 scaler = MinMaxScaler()
 
@@ -54,15 +55,15 @@ class DataGeneratorSeq(object):
         self._cursor = [offset * self._segments for offset in range(self._batch_size)]
 
     def next_batch(self):
-        batch_data = np.zeros((self._batch_size), dtype=np.float32)
-        batch_labels = np.zeros((self._batch_size), dtype=np.float32)
+        batch_data = np.zeros((self._batch_size, 5), dtype=np.float32)
+        batch_labels = np.zeros((self._batch_size, 5), dtype=np.float32)
 
         for b in range(self._batch_size):
             if self._cursor[b]+1>=self._prices_length:
                 self._cursor[b] = np.random.randint(0, (b + 1)*self._segments)
             
-            batch_data[b] = self._prices[self._cursor[b]]
-            batch_labels[b] = self._prices(self._cursor[b]+np.random.randint(1, 5))
+            batch_data[b] = self._prices[self._cursor[b], :]
+            batch_labels[b] = self._prices[self._cursor[b]+np.random.randint(1, 5), 3]
 
             self._cursor[b] = (self._cursor[b]+1)%self._prices_length
         
@@ -71,12 +72,12 @@ class DataGeneratorSeq(object):
     def unroll_batches(self):
         
         unroll_data, unroll_labels = [],[]
-        init_data, init_label = None, None
         for ui in range(self._num_unroll):
             data, labels = self.next_batch()
 
             unroll_data.append(data)
             unroll_labels.append(labels)
+        return unroll_data, unroll_labels
     
     def reset_indices(self):
         for b in range(self._batch_size):
@@ -132,7 +133,7 @@ c, h = [], []
 initial_state = []
 for li in range(n_layers):
     c.append(tf.Variable(tf.zeros([batch_size, num_nodes[li]]), trainable=False))
-    h.append(tf.Variable(tf.zeros([batch_size, num_nodes]), trainable=False))
+    h.append(tf.Variable(tf.zeros([batch_size, num_nodes[li]]), trainable=False))
     initial_state.append(tf.contrib.rnn.LSTMStateTuple(c[li], h[li]))
 
 # Transform data into shape [num_unrollings, batch_size(timesteps), inputs]
@@ -146,7 +147,7 @@ all_lstm_outputs, state = tf.nn.dynamic_rnn(
 )
 
 # Reshape outputs
-all_lstm_outputs = tf.reshape(all_lstm_output, [batch_size * num_unrollings, num_nodes[-1]])
+all_lstm_outputs = tf.reshape(all_lstm_outputs, [batch_size * num_unrollings, num_nodes[-1]])
 
 # Apply linear regression
 all_outputs = tf.nn.xw_plus_b(all_lstm_outputs, w, b)
