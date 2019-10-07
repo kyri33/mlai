@@ -42,6 +42,9 @@ for di in range(0, x_train.shape[0], smoothing_window_size):
 # scaler.fit(x_train[di + smoothing_window_size:, :])
 # x_train[di + smoothing_window_size:, :] = scaler.transform(x_train[di+smoothing_window_size:, :])
 x_test = scaler.transform(x_test)
+x_test = x_test[:, close_col]
+
+all_mid_data = np.concatenate([x_train[:, close_col], x_test[:]], axis=0)
 
 # DATA GENERATION OF BATCHES
 class DataGeneratorSeq(object):
@@ -56,7 +59,7 @@ class DataGeneratorSeq(object):
 
     def next_batch(self):
         batch_data = np.zeros((self._batch_size, 5), dtype=np.float32)
-        batch_labels = np.zeros((self._batch_size, 5), dtype=np.float32)
+        batch_labels = np.zeros((self._batch_size, 1), dtype=np.float32)
 
         for b in range(self._batch_size):
             if self._cursor[b]+1>=self._prices_length:
@@ -84,7 +87,7 @@ class DataGeneratorSeq(object):
             self._cursor[b] = np.random.randint(0, min((b+1)* self._segments, self._prices_length-1))
 
 
-dg = DataGeneratorSeq(x_train, 5, 5)
+dg = DataGeneratorSeq(x_train, 5, 2)
 u_data, u_labels = dg.unroll_batches()
 for ui,(dat, lbl) in enumerate(zip(u_data, u_labels)):
     print("\n\nUnrolled index %d"%ui)
@@ -181,3 +184,99 @@ gradients, _ = tf.clip_by_global_norm(gradients, 5.0)
 optimizer = optimizer.apply_gradients(zip(gradients, v))
 
 print("\tAll done")
+
+
+print('Defining prediction related TF functions')
+
+sample_inputs = tf.placeholder(tf.float32, shape = [1, D]) # ?
+
+sample_c, sample_h, initial_sample_state = [], [], []
+for li in range(n_layers):
+    sample_c.append(tf.Variable(tf.zeros([1, num_nodes[li]]), trainable=False))
+    sample_h.append(tf.Variable(tf.zeros([1, num_nodes[li]]), trainable=False))
+    initial_sample_state.append(tf.contrib.rnn.LSTMStateTuple(sample_c[li], sample_h[li]))
+
+reset_sample_states = tf.group(*[tf.assign(sample_c[li],tf.zeros([1, num_nodes[li]])) for li in range(n_layers)], 
+                            *[tf.assign(sample_h[li], tf.zeros([1, num_nodes[li]])) for li in range(n_layers)])
+
+sample_outputs, sample_state = tf.nn.dynamic_rnn(multi_cell, tf.expand_dims(sample_inputs, 0), 
+                                initial_state=tuple(initial_sample_state), time_major = True,
+                                dtype=tf.float32)
+with tf.control_dependencies([tf.assign(sample_c[li], sample_state[li][0]) for li in range(n_layers)] +
+                            [tf.assign(sample_h[li], sample_state[li][0]) for li in range(n_layers)]):
+    sample_prediction = tf.nn.xw_plus_b(tf.reshape(sample_outputs,[1, -1]), w, b)
+
+print("\tAll Done")
+
+# RUNNING THE LSTM
+
+epochs = 30
+valid_summary = 1 # Interval to make test predictions
+
+n_predict_once = 50 # Number of time steps you continuously predict for
+
+train_seq_length = x_train.shape[0] # Full length of training data
+
+train_mse_ot = [] # Training errors acumulated 
+test_mse_ot = [] # Test loss
+predictions_over_time = [] # Accumulate predictions
+
+session = tf.InteractiveSession()
+
+tf.global_variables_initializer().run()
+
+# Used for decaying learning rate
+loss_nondecrease_count = 0
+loss_nondecrease_threshold = 2 # If test error hasn't in creased in this many steps then decrease learning rate
+
+print("Initialized")
+average_loss = 0
+
+data_gen = DataGeneratorSeq(x_train, batch_size, num_unrollings)
+
+x_axis_seq = []
+
+# Points you start our test predictions from
+test_points_seq = np.arange(0, x_test.shape[0], 50).tolist()
+
+for ep in range(epochs):
+
+    # ===================== TRAINING
+    for step in range(train_seq_length // batch_size):
+        u_data, u_labels = data_gen.unroll_batches()
+
+        feed_dict = {}
+        for ui, (dat,lbl) in enumerate(zip(u_data, u_labels)):
+            feed_dict[train_inputs[ui]] = dat.reshape(-1, 1) # !!!!! TODO TODO TODO
+            feed_dict[train_outputs[ui]] = lbl.reshape(-1, 1)
+
+        feed_dict.update({tf.learning_rate: 0.0001, tf_min_learning_rate: 0.000001})
+
+        _, l = session.run([optimizer, loss], feed_dict=feed_dict)
+
+        average_loss += 1
+
+    # ===================== VALIDATION
+    if (ep+1) % valid_summary == 0:
+
+        average_loss = average_loss / (valid_summary * (train_seq_length//batch_size))
+
+        print("Average loss at step %d: %f" % (ep+1, average_loss))
+
+        train_mse_ot.append(average_loss)
+        average_loss = 0 # Reset loss ?
+        predictions_seq = []
+        mse_test_loss_seq = []
+
+        # ===================== UPDATING STATE AND MAKING PREDICTIONS
+        for w_i in test_points_seq:
+            mse_test_loss = 0.0
+            our_predictions = []
+
+            if (ep+1) - valid_summary == 0:
+                x_axis = [] # Only calculate x axis values in first validation epoch
+            
+            # Feed in the recent past behavior of stock prices
+            # to make predictions form that point onwards
+            for tr_i in range(w_i - num_unrollings+1, w_i-1):
+                current_price
