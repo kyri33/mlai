@@ -32,9 +32,18 @@ def generateEpisode():
 
 for it in tqdm(range(numIterations)):
     episode = generateEpisode()
+    print(episode[::-1][:])
     G = 0
-    for i, step in enumerate(episode[::-1]): # Enumerate adds index for i and the arr is going backwards ! with ::-1
+    for i, step in enumerate(episode[::-1]):   # Enumerate adds index for i and the arr is going backwards ! with ::-1
+        #print(i, step)
         G = gamma*G + step[2] # reward
+        print([x[0] for x in episode[::-1][len(episode) - i:]])
+        if step[0] not in [x[0] for x in episode[::-1][len(episode) - i:]]:
+            idx = (step[0][0], step[0][1])
+            returns[idx].append(G)
+            newValue = np.average(returns[idx])
+            deltas[idx].append(np.average(V[idx[0], idx[1]] - newValue))
+            V[idx[0], idx[1]] = newValue
     exit()
 
 generateEpisode()
