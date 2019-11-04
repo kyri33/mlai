@@ -1,6 +1,5 @@
 import tensorflow as tf
 import numpy as np
-import retro
 from skimage import transform
 from skimage.color import rgb2gray
 import collections
@@ -81,17 +80,17 @@ gamma = 0.9
 
 def pick_action(state, decay_step):
     e = np.random.rand(1)[0]
-    #epsilon = np.exp(-decay_rate * decay_step)
-    epsilon = 0.0
+    epsilon = np.exp(-decay_rate * decay_step)
+    #epsilon = 0.0
     if epsilon > e:
         action = env.action_space.sample()
     else:
-        action = np.argmax(model.predict(state))
+        action = np.argmax(model.predict(state.reshape(1, *state.shape)))
     return action, epsilon
 
 n_episodes = 50000
 max_steps = 50000
-episode_render = True
+episode_render = False
 
 decay_step = 1
 reward_list = []
@@ -114,11 +113,39 @@ for episode in range(n_episodes):
             next_state = np.zeros(state.shape)
             next_state = stack_frames(next_state)
             memory.add((state, action, reward, next_state, done))
-            reward_list.append((episode, np.sum(episode_rewards)))
+            total_reward = np.sum(episode_rewards)
+            reward_list.append((episode, total_reward))
+            print("Episode: {}".format(episode),
+                "Total Reward: {}".format(total_reward),
+                "Explore P: {:.4f}".format(epsilon),
+                "Training Loss {:.4f}".format(loss))
             break
         else:
             next_state = stack_frames(next_state)
             memory.add((state, action, reward, next_state, done))
             state = next_state
-        
     
+    batch = memory.sample(batch_size)
+    states_mb = np.array([each[0] for each in batch])
+    actions_mb = np.array([each[1] for each in batch])
+    rewards_mb = np.array([each[2] for each in batch])
+    next_states_mb = np.array([each[3] for each in batch])
+    dones_mb = np.array([each[4] for each in batch])
+
+    target_batch = []
+    for i in range(batch_size):
+        terminal = dones_mb[i]
+        predict = model.predict(next_states_mb[i].reshape(1, *next_states_mb[i].shape))
+        if terminal:
+            target = rewards_mb[i]
+        else:
+            target = rewards_mb[i] + gamma * np.max(predict)
+        target_f = model.predict(states_mb[i].reshape([1, *state_size]))
+        target_f = target_f.reshape([4])
+        target_f[actions_mb[i]] = target
+        target_batch.append(target_f)
+    target_batch = np.array(target_batch)
+    history = model.fit(states_mb, target_batch, verbose=0)
+    loss = float(history.history['loss'][0])
+    if episode % 1000 == 0:
+        model.save_weights('./models/breakout_checkpoint')
