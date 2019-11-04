@@ -48,7 +48,7 @@ class DQNAgent:
         if self.epsilon > self.epsilon_min:
             self.epsilon = self.epsilon * self.epsilon_decay
         
-episodes = 100
+episodes = 1000
 
 env = gym.make("CartPole-v0")
 agent = DQNAgent(4, 2)
