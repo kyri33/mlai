@@ -1,107 +1,156 @@
-import tensorflow as tf
-import tensorflow.keras as keras
-import numpy as np
-import collections
 import gym
-import threading
+import numpy as np
+import tensorflow as tf
+import tensorflow.keras.layers as kl
+import tensorflow.keras.losses as kls
+import tensorflow.keras.optimizers as ko
+import tensorflow.keras as keras
+import logging
+import matplotlib.pyplot as plt
+import multiprocessing
+from multiprocessing import Process
 
-class ActorCriticModel(keras.Model):
-    def __init__(self, state_size, action_size):
-        super(ActorCriticModel, self).__init__()
-        self.state_size = state_size
-        self.action_size = action_size
-        self.dense1 = keras.layers.Dense(100, activation='relu')
-        self.policy_logits = keras.layers.Dense(action_size)
+class ProbabilityDistribution(keras.Model):
+    def call(self, logits):
+        return tf.squeeze(tf.random.categorical(logits, 1), axis=-1)
 
-        self.dense2 = keras.layers.Dense(100, activation='relu')
-        self.values = keras.layers.Dense(1)
+class Model(keras.Model):
+    def __init__(self, num_actions):
+        super().__init__('mlp_policy')
+        self.hidden1 = kl.Dense(128, activation='relu')
+        self.hidden2 = kl.Dense(128, activation='relu')
 
+        self.value = kl.Dense(1, name='value')
+        self.logits = kl.Dense(num_actions, name='policy_logits')
+        self.dist = ProbabilityDistribution()
+    
     def call(self, inputs):
-        # Forward pass
-        x = self.dense1(inputs)
-        logits = self.policy_logits(x)
+        x = tf.convert_to_tensor(inputs)
 
-        v = self.dense2(inputs)
-        values = self.values(v)
-        return logits, values
+        hidden_logs = self.hidden1(x)
+        hidden_vals = self.hidden2(x)
 
-class MasterAgent():
-    def __init__(self):
-        self.game_name = "CartPole-v0"
-        save_dir = args.save_dir
-        self.save_dir = args.save_dir
-        if not os.path.exists(save_dir):
-            os.makedirs(save_dir)
+        return self.logits(hidden_logs), self.value(hidden_vals)
+    
+    def action_value(self, inputs):
+        logits, value = self.predict_on_batch(inputs)
+        action = self.dist.predict_on_batch(logits)
+        return np.squeeze(action, axis=-1), np.squeeze(value, axis=-1)
+
+arr = np.random.rand(1, 8)
+model = Model(4)
+a, v = model.action_value(arr)
+
+checkpoint = "cartpole_checkpoint2"
+
+class A2CAgent:
+    def __init__(self, model):
+        self.params = {
+            'gamma': 0.99,
+            'value': 0.5,
+            'entropy': 0.0001
+        }
+        self.model = model
+        self.model.compile(
+            optimizer = ko.RMSprop(lr=0.0007),
+            loss=[self._logits_loss, self._value_loss]
+        )
+        self.env = gym.make("CartPole-v0")
+    
+    def train(self, batch_sz=32, updates=100):
+        actions = np.empty((batch_sz,), dtype=np.int32)
+        rewards, dones, values = np.empty((3, batch_sz))
+        observations = np.empty(((batch_sz,) + self.env.observation_space.shape))
+
+        ep_rews=[0.0]
+        ep_loss = []
+        next_obs = self.env.reset()
+        for update in range(updates):
+            for step in range(batch_sz):
+                observations[step] = next_obs.copy()
+                actions[step], values[step] = self.model.action_value(next_obs[None,:])
+
+                next_obs, rewards[step], dones[step], _ = self.env.step(actions[step])
+                self.env.render()
+                ep_rews[-1] += rewards[step]
+                if dones[step]:
+                    ep_rews.append(0.0)
+                    next_obs = self.env.reset()
+
+            print("Episode:", update, "Reward:", ep_rews[-1])            
+            _, next_value = self.model.action_value(next_obs[None, :])
+            returns, advantages = self._returns_advantages(rewards, dones, values, next_value)
+            act_adv = np.concatenate((actions[:, None], advantages[:, None]), axis=-1)
+            losses = self.model.train_on_batch(observations, [act_adv, returns])
+            ep_loss.append(losses)
+            if update % 25 == 0:
+                self.model.save_weights('./models/' + checkpoint)
+        return ep_rews, ep_loss
+
+    def _returns_advantages(self, rewards, dones, values, next_value):
+        returns = np.append(np.zeros_like(rewards), [next_value], axis=-1)
+
+        for t in reversed(range(len(rewards))):
+            returns[t] = rewards[t] + self.params['gamma'] * returns[t + 1] * (1-dones[t])
+        returns = returns[:-1]
+        advantages = returns - values
+        return returns, advantages
+
+    def _value_loss(self, returns, values):
+        return self.params['value'] * tf.keras.losses.mean_squared_error(returns, values)
+
+    def _logits_loss(self, act_adv, logits):
+        actions, advantages = tf.split(act_adv, 2, axis=-1)
         
-        env = gym.make(self.game_name)
-        self.state_size = env.observation_space.shape[0]
-        self.action_size = env.action_size.n
-        self.opt = tf.train.AdamOptimizer(args.lr, use_locking=True)
-        print(self.state_size, self.action_size)
+        cross_entropy = kls.SparseCategoricalCrossentropy(from_logits=True)
 
-        self.global_model = ActorCriticModel(self.state_size, self.action_size)
+        actions = tf.cast(actions, tf.int32)
+        policy_loss = cross_entropy(actions, logits, sample_weight=advantages)
+        entropy_loss = kls.categorical_crossentropy(logits, logits, from_logits=True)
 
-class Memory:
-    def __init__(self, mem_size):
-        self.states = collections.deque(maxlen=mem_size)
-        self.actions = collections.deque(maxlen=mem_size)
-        self.rewards = collections.deque(maxlen=mem_size)
-        self.mem_size = mem_size
+        return policy_loss - entropy_loss * self.params['entropy']
 
-    def store(self, state, action, reward):
-        self.states.append(state)
-        self.actions.append(action)
-        self.rewards.append(reward)
+logging.getLogger().setLevel(logging.INFO)
 
-    def clear(self):
-        self.states = collections.deque(maxlen=self.mem_size)
-        self.actions = collections.deque(maxlen=self.mem_size)
-        self.rewards = collections.deque(maxlen=self.mem_size)
+env = gym.make("CartPole-v0")
+model = Model(env.action_space.n)
 
-class Worker(threading.Thread):
-    # global variables
-    global_episode = 0
-    global_moving_average = 0
-    best_score = 0
-    save_lock = threading.Lock()
+training = True
 
-    def __init(self, state_size, action_size, global_model, opt, result_queue, idx, game_name="CartPole-v0", save_dir="/tmp"):
-        super(Worker, self).__init__()
-        self.state_size = state_size
-        self.result_queue = result_queue
-        self.global_model = global_model
-        self.opt = opt
-        self.local_model = ActorCriticModel(state_size, action_size)
-        self.worder_idx = idx
-        self.game_name = game_name
-        self.env = gym.make(game_name).unwrapped
-        self.save_dir = save_dir
-        self.ep_loss = 0.0
+if training:
+    agent = A2CAgent(model)
 
-    def run(self):
-        total_step = 1
-        mem = Memory()
-        while Worker.global_episode < args.max_eps:
-            current_state = self.env.reset()
-            mem.clear()
-            ep_reward = 0.
-            ep_steps = 0
-            self.ep_loss = 0
+    procs = []
+    agents = []
+    '''
+    for i in range(multiprocessing.cpu_count()):
+        print('starting')
+        agent = A2CAgent(model)
+        agents.append(agent)
+        process = Process(target=agent.train)
+        procs.append(process)
+        process.start()
+    print('done')
+    for proc in procs:
+        proc.join()
+    '''
 
-            time_count = 0
-            done = False
-            while not done:
-                logits, _ = self.local_model(tf.convert_to_tensor(current_state[None, :],
-                        dtype=tf.float32))
-                probs = tf.nn.softmax(logits)
+    rewards_history, losses=agent.train()
 
-                action = np.random.choice(self.action_size, p=probs.numpy()[0])
-                new_state, reward, done, _ = self.env.step(action)
-                if done:
-                    reward = -1
-                ep_reward += reward
-                mem.store(current_state, action, reward)
+    plt.style.use('seaborn')
+    plt.plot(np.arange(0, len(rewards_history), 25), rewards_history[::25])
+    plt.xlabel('Episode')
+    plt.ylabel('Total Reward')
+    plt.show()
+    losses = np.array(losses)
+    plt.plot(range(0, len(losses[5:])), losses[5:, 1:])
+    plt.show()
 
-                if time_count == args.update_freq or done:
-                    with tf.GradientTape() as tape:
-                        total_loss = self.compute_loss(done)
+model.load_weights("./models/" + checkpoint)
+for i in range(20):
+    done = False
+    obs = env.reset()
+    while not done:
+        action, _ = model.action_value(obs[None, :])
+        obs, _, done, _ = env.step(action)
+        env.render()
