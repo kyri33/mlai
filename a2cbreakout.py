@@ -13,6 +13,7 @@ import sys
 import argparse
 import os
 
+matplotlib.use('Agg')
 parser = argparse.ArgumentParser()
 parser.add_argument('-g', dest='gamma', type=float, required=True)
 parser.add_argument('-v', dest='value', type=float, required=True)
