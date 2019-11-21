@@ -138,7 +138,7 @@ class A2CAgent:
         self.action_size = action_size
         self.state_size = state_size
     
-    def train(self, env, episodes=100000):
+    def train(self, env, episodes=10):
         batch_sz = batch_size
         observations = np.empty((batch_sz,) + self.state_size)
         actions = np.empty((batch_sz,), dtype=np.int32)
@@ -161,7 +161,7 @@ class A2CAgent:
                     next_obs = stack_frames(n_state, is_new=True)
                 else:
                     next_obs = stack_frames(next_state)
-            if episode > 0 and episode % 1000 == 0:
+            if episode > 0 and episode % 2 == 0:
                 print("Episode:", episode, "Reward:", ep_rews[-1], "Losses:", losses)
 
             _, next_value = self.model.action_value(next_obs.reshape(1, *self.state_size))
@@ -170,7 +170,7 @@ class A2CAgent:
             act_adv = np.concatenate((actions[:,None], advantages[:,None]), axis=-1)
             losses = self.model.train_on_batch(observations, [act_adv, returns])
             ret_losses.append(losses)
-            if episode % 1000 == 0 and episode != 0:
+            if episode % 2 == 0 and episode != 0:
                 self.model.save_weights("./models/a2_breakout")
         return ep_rews, ret_losses
     
