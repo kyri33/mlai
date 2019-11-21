@@ -11,19 +11,50 @@ from skimage import io
 import collections
 import sys
 import argparse
+import os
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-g', dest='gamma', type=float, required=True)
 parser.add_argument('-v', dest='value', type=float, required=True)
-parser.add_argument('-e', dest='entropy', type=float, requried=True)
-parser.add_argument('-l', dest='lr', type=float, require=True)
+parser.add_argument('-e', dest='entropy', type=float, required=True)
+parser.add_argument('-l', dest='lr', type=float, required=True)
 parser.add_argument('-b', dest='batch_size', type=int, required=True)
 parser.add_argument('--name', dest='name', required=True)
 parser.add_argument('--desc', dest='description', required=True)
 
-
-
 args = parser.parse_args()
+
+gamma = args.gamma
+value = args.value
+entropy = args.entropy
+learning_rate = args.lr
+batch_size = args.batch_size
+render = False
+name = args.name
+description = args.description
+
+dict = {
+    "gamma": gamma,
+    'value': value,
+    'entropy': entropy,
+    'learning_rate': learning_rate,
+    'batch_size': batch_size
+}
+
+f = open("params.txt", "w+")
+
+f.write("\n" + name + "\n\n")
+f.write(description + "\n\n")
+f.write("params:\n")
+
+for key,val in dict.items():
+    f.write("\t" + key + " : " + str(val) + "\n")
+
+
+try:
+    os.mkdir('models')
+except:
+    print("Models Directory exists")
 
 def process_frame(frame):
     gray = np.mean(frame, axis=2)
@@ -90,24 +121,26 @@ class Model(keras.Model):
         action = self.dist.predict_on_batch(logits)
         return np.squeeze(action, axis=-1), np.squeeze(value, axis=-1)
 
-#model = Model(action_size)
-
 class A2CAgent:
     def __init__(self, model, state_size, action_size):
         self.params = {
-            'gamma': 0.99,
-            'value': 0.5,
-            'entropy': 0.0001
+            'gamma': gamma,
+            'value': value,
+            'entropy': entropy
         }
         self.model = model
         self.model.compile(
-            optimizer = ko.Adam(lr=0.0001),
+            optimizer = ko.Adam(lr=learning_rate),
             loss=[self._logits_loss, self._value_loss]
         )
+        self.model.action_value(np.zeros((1, *state_size)))
+        self.model.summary(print_fn=lambda x: f.write("\n" + x + '\n'))
+        f.close()
         self.action_size = action_size
         self.state_size = state_size
     
-    def train(self, env, batch_sz=64, episodes=10000):
+    def train(self, env, episodes=10):
+        batch_sz = batch_size
         observations = np.empty((batch_sz,) + self.state_size)
         actions = np.empty((batch_sz,), dtype=np.int32)
         rewards, dones, values = np.empty((3, batch_sz))
@@ -122,7 +155,6 @@ class A2CAgent:
                 observations[step] = next_obs.copy()
                 actions[step], values[step] = self.model.action_value(next_obs.reshape(1, *self.state_size))
                 next_state, rewards[step], dones[step], _ = self.env.step(actions[step])
-                env.render()
                 ep_rews[-1] += rewards[step]
                 if dones[step]:
                     ep_rews.append(0.0)
@@ -130,7 +162,8 @@ class A2CAgent:
                     next_obs = stack_frames(n_state, is_new=True)
                 else:
                     next_obs = stack_frames(next_state)
-            print("Episode:", episode, "Reward:", ep_rews[-1], "Losses:", losses)
+            if episode > 0 and episode % 1000 == 0:
+                print("Episode:", episode, "Reward:", ep_rews[-1], "Losses:", losses)
 
             _, next_value = self.model.action_value(next_obs.reshape(1, *self.state_size))
 
@@ -138,8 +171,7 @@ class A2CAgent:
             act_adv = np.concatenate((actions[:,None], advantages[:,None]), axis=-1)
             losses = self.model.train_on_batch(observations, [act_adv, returns])
             ret_losses.append(losses)
-            if episode % 50 == 0 and episode != 0:
-                print("Saving weights")
+            if episode % 1000 == 0 and episode != 0:
                 self.model.save_weights("./models/a2_breakout")
         return ep_rews, ret_losses
     
@@ -178,11 +210,7 @@ if training:
     plt.plot(np.arange(0, len(rewards_history), 25), rewards_history[::25])
     plt.xlabel('Episode')
     plt.ylabel('Total Reward')
-    plt.show()
-    losses = np.array(losses)
-    print(losses[3:, 1:])
-    plt.plot(range(len(losses[3:])), losses[3:, 1:])
-    plt.show()
+    plt.savefig('rewards.png')
 else:
     model.load_weights("./models/a2_breakout")
     for i in range(20):
