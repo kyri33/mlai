@@ -5,6 +5,7 @@ import tensorflow.keras.layers as kl
 import tensorflow.keras.losses as kls
 import tensorflow.keras.optimizers as ko
 import tensorflow.keras as keras
+import matplotlib
 import matplotlib.pyplot as plt
 import skimage
 from skimage import io
