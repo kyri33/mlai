@@ -50,7 +50,6 @@ f.write("params:\n")
 for key,val in dict.items():
     f.write("\t" + key + " : " + str(val) + "\n")
 
-
 try:
     os.mkdir('models')
 except:
@@ -139,7 +138,7 @@ class A2CAgent:
         self.action_size = action_size
         self.state_size = state_size
     
-    def train(self, env, episodes=10):
+    def train(self, env, episodes=100000):
         batch_sz = batch_size
         observations = np.empty((batch_sz,) + self.state_size)
         actions = np.empty((batch_sz,), dtype=np.int32)
