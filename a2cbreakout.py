@@ -6,6 +6,7 @@ import tensorflow.keras.losses as kls
 import tensorflow.keras.optimizers as ko
 import tensorflow.keras as keras
 import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import skimage
 from skimage import io
@@ -14,7 +15,6 @@ import sys
 import argparse
 import os
 
-matplotlib.use('Agg')
 parser = argparse.ArgumentParser()
 parser.add_argument('-g', dest='gamma', type=float, required=True)
 parser.add_argument('-v', dest='value', type=float, required=True)
