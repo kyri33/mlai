@@ -9,6 +9,21 @@ import matplotlib.pyplot as plt
 import skimage
 from skimage import io
 import collections
+import sys
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-g', dest='gamma', type=float, required=True)
+parser.add_argument('-v', dest='value', type=float, required=True)
+parser.add_argument('-e', dest='entropy', type=float, requried=True)
+parser.add_argument('-l', dest='lr', type=float, require=True)
+parser.add_argument('-b', dest='batch_size', type=int, required=True)
+parser.add_argument('--name', dest='name', required=True)
+parser.add_argument('--desc', dest='description', required=True)
+
+
+
+args = parser.parse_args()
 
 def process_frame(frame):
     gray = np.mean(frame, axis=2)
@@ -47,7 +62,7 @@ class Model(keras.Model):
     def __init__(self, action_size):
         super().__init__('mlp_policy')
         
-        self.conv1 = kl.Conv2D(32, 3, strides=2, activation='relu')
+        self.conv1 = kl.Conv2D(32, 8, strides=4, activation='relu')
         self.conv2 = kl.Conv2D(64, 4, strides=2, activation='relu')
         self.conv3 = kl.Conv2D(64, 3, strides=1, activation='relu')
         self.fl = kl.Flatten()
@@ -156,7 +171,7 @@ model = Model(env.action_space.n)
 training = True
 
 if training:
-    model.load_weights("./models/a2_breakout")
+    #model.load_weights("./models/a2_breakout")
     agent = A2CAgent(model, state_size, action_size)
     rewards_history, losses = agent.train(env)
     plt.style.use('seaborn')
