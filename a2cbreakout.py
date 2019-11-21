@@ -205,7 +205,7 @@ if training:
     #model.load_weights("./models/a2_breakout")
     agent = A2CAgent(model, state_size, action_size)
     rewards_history, losses = agent.train(env)
-    plt.style.use('seaborn')
+    #plt.style.use('seaborn')
     plt.plot(np.arange(0, len(rewards_history), 25), rewards_history[::25])
     plt.xlabel('Episode')
     plt.ylabel('Total Reward')
