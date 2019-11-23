@@ -135,7 +135,7 @@ class A2CAgent:
         }
         self.model = model
         self.model.compile(
-            optimizer = ko.Adam(lr=learning_rate),
+            optimizer = ko.RMSprop(lr=learning_rate),
             loss=[self._logits_loss, self._value_loss]
         )
         self.model.action_value(np.zeros((1, *state_size)))
