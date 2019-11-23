@@ -15,6 +15,8 @@ import sys
 import argparse
 import os
 
+training = True
+
 parser = argparse.ArgumentParser()
 parser.add_argument('-g', dest='gamma', type=float, required=True)
 parser.add_argument('-v', dest='value', type=float, required=True)
@@ -43,19 +45,21 @@ dict = {
     'batch_size': batch_size
 }
 
-f = open("params.txt", "w+")
+if training:
 
-f.write("\n" + name + "\n\n")
-f.write(description + "\n\n")
-f.write("params:\n")
+    f = open("params.txt", "w+")
 
-for key,val in dict.items():
-    f.write("\t" + key + " : " + str(val) + "\n")
+    f.write("\n" + name + "\n\n")
+    f.write(description + "\n\n")
+    f.write("params:\n")
 
-try:
-    os.mkdir('models')
-except:
-    print("Models Directory exists")
+    for key,val in dict.items():
+        f.write("\t" + key + " : " + str(val) + "\n")
+
+    try:
+        os.mkdir('models')
+    except:
+        print("Models Directory exists")
 
 def process_frame(frame):
     gray = np.mean(frame, axis=2)
@@ -140,7 +144,7 @@ class A2CAgent:
         self.action_size = action_size
         self.state_size = state_size
     
-    def train(self, env, episodes=100000):
+    def train(self, env, episodes=300000):
         batch_sz = batch_size
         observations = np.empty((batch_sz,) + self.state_size)
         actions = np.empty((batch_sz,), dtype=np.int32)
@@ -201,7 +205,6 @@ class A2CAgent:
 
 env = gym.make("BreakoutDeterministic-v4")
 model = Model(env.action_space.n)
-training = True
 
 if training:
     #model.load_weights("./models/a2_breakout")
