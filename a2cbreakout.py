@@ -196,7 +196,7 @@ class A2CAgent:
         returns = np.append(np.zeros_like(rewards), next_value)
         for t in reversed(range(len(rewards))):
             if dones[t]:
-                rewards[t] = -1
+                rewards[t] = -5
             else:
                 returns[t] = rewards[t] + self.params['gamma'] * returns[t + 1] * (1 - dones[t])
         returns = returns[:-1]
