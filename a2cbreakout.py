@@ -15,7 +15,8 @@ import sys
 import argparse
 import os
 
-training = True
+training = False
+render = True
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-g', dest='gamma', type=float, required=True)
@@ -33,7 +34,6 @@ value = args.value
 entropy = args.entropy
 learning_rate = args.lr
 batch_size = args.batch_size
-render = False
 name = args.name
 description = args.description
 
@@ -61,6 +61,37 @@ if training:
     except:
         print("Models Directory exists")
 
+
+class WrapperEnv(gym.Wrapper):
+    def __init__(self, env):
+        super(WrapperEnv, self).__init__(env)
+        self.observation_space = env.observation_space
+        self.lives=0
+        self.lastobs = []
+        self.out_of_lives = False
+        self.started = False
+
+    def reset(self):
+        if self.out_of_lives or not self.started:
+            obs = self.env.reset()
+            self.lastobs = obs
+            self.started = True
+            self.out_of_lives = False
+        else:
+            obs = self.lastobs
+        self.lives = self.env.unwrapped.ale.lives()
+        return obs
+
+    def step(self, action):
+        obs, reward, done, info = self.env.step(action)
+        self.out_of_lives = done
+        lives = self.env.unwrapped.ale.lives()
+        if lives < self.lives:
+            done = True
+        self.lives = lives
+        self.lastobs = obs
+        return obs, reward, done, info
+
 def process_frame(frame):
     gray = np.mean(frame, axis=2)
     norm = gray / 255.
@@ -82,10 +113,10 @@ def stack_frames(state, is_new=False):
         stacked_frames.append(state)
     return np.stack(stacked_frames, axis=2)
 
-env = gym.make("BreakoutDeterministic-v4")
-action_size = env.action_space.n
+envt = gym.make("BreakoutDeterministic-v4")
+action_size = envt.action_space.n
 
-frame = env.reset()
+frame = envt.reset()
 processed_frame = stack_frames(frame, is_new=True)
 
 state_size = processed_frame.shape
@@ -123,6 +154,8 @@ class Model(keras.Model):
     
     def action_value(self, inputs):
         logits, value = self.predict_on_batch(inputs)
+        #action = np.argmax(logits)
+        #exit()
         action = self.dist.predict_on_batch(logits)
         return np.squeeze(action, axis=-1), np.squeeze(value, axis=-1)
 
@@ -139,12 +172,13 @@ class A2CAgent:
             loss=[self._logits_loss, self._value_loss]
         )
         self.model.action_value(np.zeros((1, *state_size)))
-        self.model.summary(print_fn=lambda x: f.write("\n" + x + '\n'))
+        #self.model.summary(print_fn=lambda x: f.write("\n" + x + '\n'))
         f.close()
         self.action_size = action_size
         self.state_size = state_size
     
-    def train(self, env, episodes=300000):
+    def train(self, env, episodes=10000):
+        global render
         batch_sz = batch_size
         observations = np.empty((batch_sz,) + self.state_size)
         actions = np.empty((batch_sz,), dtype=np.int32)
@@ -160,6 +194,8 @@ class A2CAgent:
                 observations[step] = next_obs.copy()
                 actions[step], values[step] = self.model.action_value(next_obs.reshape(1, *self.state_size))
                 next_state, rewards[step], dones[step], _ = self.env.step(actions[step])
+                if render:
+                    env.render()
                 ep_rews[-1] += rewards[step]
                 if dones[step]:
                     ep_rews.append(0.0)
@@ -184,7 +220,7 @@ class A2CAgent:
         return self.params['value'] * kls.mean_squared_error(returns, values)
     
     def _logits_loss(self, act_adv, logits):
-        ce = kls.SparseCategoricalCrossentropy(from_logits=True)
+        ce = kls.CategoricalCrossentropy(from_logits=True)
         actions, advantages = tf.split(act_adv, 2, axis=-1)
         actions = tf.cast(actions, tf.int32)
         policy_loss = ce(actions, logits, sample_weight=advantages)
@@ -196,7 +232,7 @@ class A2CAgent:
         returns = np.append(np.zeros_like(rewards), next_value)
         for t in reversed(range(len(rewards))):
             if dones[t]:
-                rewards[t] = -5
+                rewards[t] = -1
             else:
                 returns[t] = rewards[t] + self.params['gamma'] * returns[t + 1] * (1 - dones[t])
         returns = returns[:-1]
@@ -204,6 +240,7 @@ class A2CAgent:
         return returns, advantages
 
 env = gym.make("BreakoutDeterministic-v4")
+env = WrapperEnv(env)
 model = Model(env.action_space.n)
 
 if training:
@@ -217,7 +254,7 @@ if training:
     plt.savefig('rewards.png')
 else:
     model.load_weights("./models/a2_breakout")
-    for i in range(20):
+    for i in range(100):
         done = False
         obs = env.reset()
         obs = stack_frames(obs, is_new=True)
