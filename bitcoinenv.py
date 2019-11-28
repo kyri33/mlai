@@ -5,10 +5,19 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from mpl_finance import candlestick_ochl as candlestick
+from sklearn import preprocessing
+import random
 
 MAX_ACCOUNT_BALANCE = 2147483647
 MAX_TRADING_SESSION = 100000  # ~2 months
 MIN_TRADING_SESSSION = 25000 # 2 Weeks
+
+VOLUME_CHART_HEIGHT = 0.33
+
+UP_COLOR = '#27A59A'
+DOWN_COLOR = '#EF534F'
+UP_TEXT_COLOR = '#73D3CC'
+DOWN_TEXT_COLOR = '#DC2C27'
 
 def date2num(date):
     converter = mdates.strpdate2num('%Y-%m-%d')
@@ -19,6 +28,7 @@ class StockTradingGraph:
     def __init__(self, df, title=None):
         self.df = df
         self.net_worths= np.zeros(len(df['Date']))
+        self.visualization = None
 
         fig = plt.figure()
         fig.suptitle(title)
@@ -110,13 +120,46 @@ class StockTradingGraph:
             step_range):
         
         self.volume_ax.clear()
-        volume.nparray(self.df['Volume'].values[step_range])
+        volume = np.array(self.df['Volume'].values[step_range])
 
         pos = self.df['Open'].values[step_range] - \
-            self.df['Close'].values[sstep_range] < 0
+            self.df['Close'].values[step_range] < 0
+        neg = self.df['Open'].values[step_range] - \
+            self.df['close'].values[step_range] > 0
+        
+        self.volume_ax.bar(dates[pos], volume[pos], color=UP_COLOR,
+                alpha=0.4, width=1, align='center')
+        self.volume_ax.bar(dates[neg], volume[neg], color=DOWN_COLOR,
+                alpha=0.4, width=1, align='center')
+
+        self.volume_ax.set_ylim(0, max(volume) / VOLUME_CHART_HEIGHT)
+        self.volume_ax.yaxis.set_ticks([])
+
+    def _render_trades(self, current_step, trades, step_range):
+        for trade in trades:
+            date = date2num(self.df['Date'].values[trade['step']])
+            high = self.df['High'].values[trade['step']]
+            low = self.df['Low'].values[trade['step']]
+
+            if trade['type'] == 'buy':
+                high_low = low
+                color = UP_TEXT_COLOR
+            else:
+                high_low = high
+                color = DOWN_TEXT_COLOR
+            
+            total = '{0:.2f}'.format(trade['total'])
+
+            self.price_ax.annotate(f'${total}', (date, high_low),
+                xytext=(date, high_low),
+                color = color,
+                fontsize=8,
+                arrowprops=(dict(color=color)))
 
 class StockEnv(gym.Env):
     metadata = {'render.modes': ['human']}
+    scaler = preprocessing.MinMaxScaler()
+    viewer = None
 
     def __init__(self, df, lookback_window_size=50, commission=0.00075,
                     initial_balance=10000, serial=False):
@@ -173,12 +216,13 @@ class StockEnv(gym.Env):
             self.active_df['Volume'].values[self.current_step:end],
             self.active_df['Close'].values[self.current_step:end]
         ])
-        scaled_history = self.scaled.fit_transform(self.account_history)
+        scaled_history = self.scaler.fit_transform(self.account_history)
         obs = np.append(obs, scaled_history[:, -(self.lookback_window_size + 1):], axis=0)
         return obs
 
     def step(self, action):
-        current_price = self._get_current_price() + 0.01
+        current_price = current_price = random.uniform(
+            self.df.loc[self.current_step, "Open"], self.df.loc[self.current_step, "Close"])
         self._take_action(action, current_price)
         self.steps_left -= 1
         self.current_step += 1
@@ -234,7 +278,7 @@ class StockEnv(gym.Env):
     def render(self, mode='live', title=None, **kwargs):
     
         if mode =='file':
-            self._render_to_file(kwargs.get('filename', 'render.txt'))
+            print("print to file TODO") #self._render_to_file(kwargs.get('filename', 'render.txt'))
         elif mode == 'live':
             if self.visualization == None:
                 self.visualization = StockTradingGraph(self.df, title)
