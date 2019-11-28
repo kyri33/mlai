@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+from mpl_finance import candlestick_ochl as candlestick
 
 MAX_ACCOUNT_BALANCE = 2147483647
 MAX_TRADING_SESSION = 100000  # ~2 months
@@ -80,6 +81,39 @@ class StockTradingGraph:
         
         self.net_worth_ax.set_ylim(min(self.net_worths[np.nonzero(self.net_worths)]) / 1.25,
                 max(self.net_worths) * 1.25)
+    
+    def _render_price(self, current_step, net_worth, dates, step_range):
+        self.price_ax.clear()
+
+        candlesticks = zip(dates, self.df['Open'].values[step_range],
+                        self.df['Close'].values[step_range],
+                        self.df['High'].values[step_range],
+                        self.df['Low'].values[step_range])
+        candlestick(self.price_ax, candlesticks, width=1,
+            colorup=UP_COLOR, colordown=DOWN_COLOR)
+        
+        last_date = date2num(self.df['Date'].values[current_step])
+        last_close = self.df['Close'].values[current_step]
+        last_high = self.df['High'].values[current_step]
+
+        self.price_ax.annoatate('{0:.2f}'.format(last_close),
+            (last_date, last_close),
+            xytext=(last_date, last_high),
+            bbox=dict(boxstyle='round', fc='w', ec='k', lw=1),
+            color='black', fontsize='small')
+        
+        ylim = self.price_ax.get_ylim()
+        self.price_ax.set_ylim(ylim[0] - (ylim[1] - ylim[0])
+                * VOLUME_CHART_HEIGHT, ylim[1])
+        
+    def _render_volume(self, current_step, net_worth, dates,
+            step_range):
+        
+        self.volume_ax.clear()
+        volume.nparray(self.df['Volume'].values[step_range])
+
+        pos = self.df['Open'].values[step_range] - \
+            self.df['Close'].values[sstep_range] < 0
 
 class StockEnv(gym.Env):
     metadata = {'render.modes': ['human']}
