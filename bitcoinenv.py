@@ -7,10 +7,14 @@ import matplotlib.dates as mdates
 from mpl_finance import candlestick_ochl as candlestick
 from sklearn import preprocessing
 import random
+import pandas as pd
+
+import gym
+
 
 MAX_ACCOUNT_BALANCE = 2147483647
-MAX_TRADING_SESSION = 100000  # ~2 months
-MIN_TRADING_SESSSION = 25000 # 2 Weeks
+MAX_TRADING_SESSION = 4000  # ~2 months
+MIN_TRADING_SESSSION = 1000 # 2 Weeks
 
 VOLUME_CHART_HEIGHT = 0.33
 
@@ -20,15 +24,15 @@ UP_TEXT_COLOR = '#73D3CC'
 DOWN_TEXT_COLOR = '#DC2C27'
 
 def date2num(date):
-    converter = mdates.strpdate2num('%Y-%m-%d')
-    return converter(date)
+    return mdates.datestr2num(date)
+    #converter = mdates.datestr2num('%Y-%m-%d')
+    #return converter(date)
 
 class StockTradingGraph:
     
     def __init__(self, df, title=None):
         self.df = df
-        self.net_worths= np.zeros(len(df['Date']))
-        self.visualization = None
+        self.net_worths= np.zeros(len(df))
 
         fig = plt.figure()
         fig.suptitle(title)
@@ -43,7 +47,7 @@ class StockTradingGraph:
         # padding
         plt.subplots_adjust(left=0.11, bottom=0.24, right=0.90,
                 top=0.90,wspace=0.2, hspace=0)
-        plt.show(block=True) # Without blocking program !!!
+        plt.show(block=False) # Without blocking program !!!
     
     def render(self, current_step, net_worth, trades,
             window_size=40):
@@ -52,10 +56,10 @@ class StockTradingGraph:
         window_start = max(current_step - window_size, 0)
         step_range = range(window_start, current_step + 1)
 
-        dates = np.array([date2num(x) for x in self.df['Date'].vallues[step_range]])
+        dates = np.array([date2num(x) for x in self.df['Date'].values[step_range]])
 
         self._render_net_worth(current_step, net_worth, 
-                window_size, dates)
+                step_range, dates)
         self._render_price(current_step, net_worth, dates, step_range)
         self._render_volume(current_step, net_worth, dates, step_range)
         self._render_trades(current_step, trades, step_range)
@@ -106,7 +110,7 @@ class StockTradingGraph:
         last_close = self.df['Close'].values[current_step]
         last_high = self.df['High'].values[current_step]
 
-        self.price_ax.annoatate('{0:.2f}'.format(last_close),
+        self.price_ax.annotate('{0:.2f}'.format(last_close),
             (last_date, last_close),
             xytext=(last_date, last_high),
             bbox=dict(boxstyle='round', fc='w', ec='k', lw=1),
@@ -122,10 +126,8 @@ class StockTradingGraph:
         self.volume_ax.clear()
         volume = np.array(self.df['Volume'].values[step_range])
 
-        pos = self.df['Open'].values[step_range] - \
-            self.df['Close'].values[step_range] < 0
-        neg = self.df['Open'].values[step_range] - \
-            self.df['close'].values[step_range] > 0
+        pos = self.df['Open'].values[step_range] - self.df['Close'].values[step_range] < 0
+        neg = self.df['Open'].values[step_range] - self.df['Close'].values[step_range] > 0
         
         self.volume_ax.bar(dates[pos], volume[pos], color=UP_COLOR,
                 alpha=0.4, width=1, align='center')
@@ -137,24 +139,24 @@ class StockTradingGraph:
 
     def _render_trades(self, current_step, trades, step_range):
         for trade in trades:
-            date = date2num(self.df['Date'].values[trade['step']])
-            high = self.df['High'].values[trade['step']]
-            low = self.df['Low'].values[trade['step']]
+            if trade['step'] in step_range:
+                date = date2num(self.df['Date'].values[trade['step']])
+                high = self.df['High'].values[trade['step']]
+                low = self.df['Low'].values[trade['step']]
 
-            if trade['type'] == 'buy':
-                high_low = low
-                color = UP_TEXT_COLOR
-            else:
-                high_low = high
-                color = DOWN_TEXT_COLOR
-            
-            total = '{0:.2f}'.format(trade['total'])
-
-            self.price_ax.annotate(f'${total}', (date, high_low),
-                xytext=(date, high_low),
-                color = color,
-                fontsize=8,
-                arrowprops=(dict(color=color)))
+                if trade['type'] == 'buy':
+                    high_low = low
+                    color = UP_TEXT_COLOR
+                else:
+                    high_low = high
+                    color = DOWN_TEXT_COLOR
+                
+                total = '{0:.2f}'.format(trade['total'])
+                self.price_ax.annotate(f'${total}', (date, high_low),
+                    xytext=(date, high_low),
+                    color = color,
+                    fontsize=8,
+                    arrowprops=(dict(color=color)))
 
 class StockEnv(gym.Env):
     metadata = {'render.modes': ['human']}
@@ -169,7 +171,8 @@ class StockEnv(gym.Env):
         self.initial_balance = initial_balance
         self.commission = commission
         self.serial = serial
-        
+        self.visualization = None
+        self.current_step = 0
         # Action space Buy/Sell/Hold , 0.1/0.2/0.3/...
         self.action_space = spaces.MultiDiscrete([3, 10])
 
@@ -240,7 +243,7 @@ class StockEnv(gym.Env):
 
     def _take_action(self, action, current_price):
         action_type = action[0]
-        amount = action[1] / 10
+        amount = action[1] / 10.0
 
         btc_bought = 0
         btc_sold = 0
@@ -260,7 +263,7 @@ class StockEnv(gym.Env):
         
         if btc_sold > 0 or btc_bought > 0:
             self.trades.append({
-                'step': self.frame_start + self.current_step,
+                'step': self.current_step,
                 'amount': btc_sold if btc_sold > 0 else btc_bought,
                 'total': sales if btc_sold > 0 else cost,
                 'type': 'sell' if btc_sold > 0 else 'buy'
@@ -285,3 +288,13 @@ class StockEnv(gym.Env):
             if self.current_step > self.lookback_window_size:
                 self.visualization.render(self.current_step, self.net_worth, 
                         self.trades, window_size = self.lookback_window_size)
+
+df = pd.read_csv('./datasets/AAPL.csv')
+env = StockEnv(pd.read_csv('./datasets/AAPL.csv'))
+env.reset()
+
+for i in range(1000):
+    action1 = np.random.randint(0, 2)
+    action2 = np.random.randint(1, 11)
+    env.step([action1, action2])
+    env.render()
