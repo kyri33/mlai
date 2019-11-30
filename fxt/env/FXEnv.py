@@ -7,6 +7,7 @@ import fxdata
 from sklearn import preprocessing
 import pandas as pd
 import random
+from FXGraph import FXGraph
 
 class FXEnv(gym.Env):
 
@@ -19,6 +20,7 @@ class FXEnv(gym.Env):
         self.group_by = fxdata.DAY
         self.initial_balance = initial_balance
         self.commission = commission
+        self.visualization = None
 
         self.action_space = spaces.MultiDiscrete([3, 3])
         self.observation_space = spaces.Box(low=0, high=1, shape=[10], dtype=np.float16)
@@ -55,7 +57,7 @@ class FXEnv(gym.Env):
         scaled_features = ['Open', 'High', 'Low', 'Close']
         prev_df = self.data[self.current_set - 1]
         scale_df = pd.concat([
-            prev_df.iloc[window_size - self.current_min:],
+            prev_df.iloc[-(window_size - self.current_min):],
             self.active_df.iloc[:self.current_min]
         ])
         scaler = preprocessing.MinMaxScaler()
@@ -74,10 +76,59 @@ class FXEnv(gym.Env):
         self.current_min += 1
 
         if self.mins_left == 0:
-            
+            # TODO Remember profits ?
+            obs = self.reset()
+    
+    def _take_action(self, action, current_price):
+        action_type = action[0]
+        amount = action[1] / 10.0
+
+        bought = 0
+        sold = 0
+        cost = 0
+        sales = 0
+
+        if action_type < 1:
+            bought = self.balance / current_price * amount
+            cost = bought * current_price * (1 + self.commission)
+            self.holding += bought
+            self.balance -= cost
+        elif action_type < 2:
+            sold = self.holding * amount
+            sales = sold * current_price * (1 - self.commission)
+            self.holding -= sold
+            self.balance += sales
+        
+        if sold > 0 or bought > 0:
+            self.trades.append({
+                'step': self.current_min,
+                'amount': sold if sold > 0 else bought,
+                'total': sales if sold > 0 else cost,
+                'type': 'sell' if sold > 0 else 'buy'
+            })
+        
+        self.net_worth = self.balance + self.holding * current_price
+        self.account_history = np.array([
+            [self.net_worth],
+            [bought],
+            [cost],
+            [sold],
+            [sales]
+        ], axis=1)
+
+    def render(self, mode='live', title=None, **kwargs):
+        if mode == 'file':
+            # TODO print to file to watch later
+            print("Print File TODO")
+        elif mode == 'live':
+            if self.visualization == None:
+                self.visualization = FXGraph(self.active_df, title)
+                
+
 
 
             
 
 env = FXEnv()
 env.reset()
+env.render()
