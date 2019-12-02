@@ -20,7 +20,7 @@ class A2CAgent:
         self.state_size = state_size
     
     def train(self, env, episodes=10000):
-        batch_sz = 128
+        batch_sz = 64
         observations = np.empty((batch_sz,) + self.state_size)
         actions = np.empty((batch_sz,), dtype=np.int32)
         rewards, dones, values = np.empty((3, batch_sz))
@@ -47,7 +47,7 @@ class A2CAgent:
             print(next_obs.shape)
             _, next_value = self.model.action_value(next_obs.reshape(1, *self.state_size))
             returns, advantages = self._returns_advantages(rewards, dones, values, next_value)
-            act_adv = np.concatenate((actions[:,None], advantages[:None]), axis=-1)
+            act_adv = np.concatenate((actions[:,None], advantages[:,None]), axis=-1)
             losses = self.model.train_on_batch(observations, [act_adv, returns])
             ret_losses.append(losses)
 
