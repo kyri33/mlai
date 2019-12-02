@@ -14,7 +14,7 @@ class FXEnv(gym.Env):
     # TODO Decide what to do with start date
 
     def __init__(self,  commission=0.00075,
-            initial_balance=100000, look_back = 60):
+            initial_balance=10000, look_back = 60):
         super(FXEnv, self).__init__()
 
         self.group_by = fxdata.DAY
@@ -23,8 +23,9 @@ class FXEnv(gym.Env):
         self.commission = commission
         self.visualization = None
 
-        self.action_space = spaces.MultiDiscrete([3, 3])
-        self.observation_space = spaces.Box(low=0, high=1, shape=[10], dtype=np.float16)
+        #self.action_space = spaces.MultiDiscrete([3, 3])
+        self.action_space = spaces.Discrete(3)
+        self.observation_space = spaces.Box(low=0, high=1, shape=[self.look_back, 4], dtype=np.float16)
 
         self.data = fxdata.load_data(fxdata.DAY)
         self.total_sets = len(self.data)
@@ -102,13 +103,14 @@ class FXEnv(gym.Env):
         else:
             obs = self._next_observation()
         
-        done = self.net_worth <= 0
+        done = self.net_worth < self.initial_balance / 3
 
         return obs, reward, done, {}
     
     def _take_action(self, action, current_price):
-        action_type = action[0]
-        amount = action[1] / 10.0
+        action_type = action
+        #amount = action[1] / 10.0
+        amount = 0.3
 
         bought = 0
         sold = 0
