@@ -21,5 +21,5 @@ def group(df, type=DAY):
     return sets
 
 def load_year(year, group_by=DAY):
-    df = pd.read_csv('./datasets/fx_' + str(year) + ".csv", sep=';', names=['Date', 'Open', 'High', 'Low', 'Close', 'Volume'])
+    df = pd.read_csv('./env/datasets/fx_' + str(year) + ".csv", sep=';', names=['Date', 'Open', 'High', 'Low', 'Close', 'Volume'])
     return group(df, group_by)

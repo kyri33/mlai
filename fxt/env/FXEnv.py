@@ -3,21 +3,22 @@ from gym import spaces
 import numpy as np
 from sklearn import preprocessing
 import random
-import fxdata
+from env import fxdata
 from sklearn import preprocessing
 import pandas as pd
 import random
-from FXGraph import FXGraph
+from env.FXGraph import FXGraph
 
 class FXEnv(gym.Env):
 
     # TODO Decide what to do with start date
 
     def __init__(self,  commission=0.00075,
-            initial_balance=10000):
+            initial_balance=100000, look_back = 60):
         super(FXEnv, self).__init__()
 
         self.group_by = fxdata.DAY
+        self.look_back = look_back
         self.initial_balance = initial_balance
         self.commission = commission
         self.visualization = None
@@ -58,13 +59,28 @@ class FXEnv(gym.Env):
         window_size = self.group_by
         scaled_features = ['Open', 'High', 'Low', 'Close']
         prev_df = self.data[self.current_set - 1]
-        scale_df = pd.concat([
-            prev_df.iloc[-(window_size - self.current_min):],
-            self.active_df.iloc[:self.current_min]
-        ], sort=False)
+
+        if self.current_min < window_size - 1:
+            scale_df = pd.concat([
+                prev_df.iloc[-(window_size - self.current_min - 1):],
+                self.active_df.iloc[:self.current_min + 1]
+            ], sort=False)
+        else:
+            scale_df = self.active_df.iloc[:self.current_min + 1]
+
         scaler = preprocessing.MinMaxScaler()
         scaler.fit(scale_df[scaled_features])
-        obs = scaler.transform(self.active_df[scaled_features].iloc[self.current_min].values.reshape(1, -1))
+
+        if self.current_min < self.look_back - 1:
+            n = self.look_back - self.current_min - 1
+            obs_df = pd.concat([
+                prev_df.iloc[-n:],
+                self.active_df.iloc[:self.current_min + 1]
+            ], sort=False)
+        else:
+            obs_df = self.active_df.iloc[self.current_min - self.look_back + 1 : self.current_min + 1]
+        
+        obs = scaler.transform(obs_df[scaled_features].values)
         
         return obs
 
@@ -138,10 +154,7 @@ class FXEnv(gym.Env):
                 self.visualization.render(self.current_min, self.net_worth,
                         self.trades)
                 
-
-
-
-            
+'''          
 env = FXEnv()
 env.reset()
 env.render()
@@ -156,3 +169,4 @@ for i in range(500):
     obs, reward, done, _ = env.step([action1, action2])
     print(reward)
     env.render()
+'''
