@@ -13,7 +13,7 @@ class FXEnv(gym.Env):
 
     # TODO Decide what to do with start date
 
-    def __init__(self,  commission=0.00075,
+    def __init__(self,  commission=0.0,
             initial_balance=10000, look_back = 60):
         super(FXEnv, self).__init__()
 
