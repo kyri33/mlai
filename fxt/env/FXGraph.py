@@ -43,7 +43,7 @@ class FXGraph:
         self._render_price(current_step, step_range)
         self._render_trades(current_step, trades, step_range)
 
-        plt.pause(0.001)
+        plt.pause(0.0001)
     
     def _render_net_worth(self, current_step,
             step_range):
