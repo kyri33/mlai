@@ -14,7 +14,7 @@ class FXEnv(gym.Env):
     # TODO Decide what to do with start date
 
     def __init__(self,  commission=0.00075,
-            initial_balance=100000):
+            initial_balance=10000):
         super(FXEnv, self).__init__()
 
         self.group_by = fxdata.DAY
@@ -32,6 +32,7 @@ class FXEnv(gym.Env):
     def reset(self):
         self.balance = self.initial_balance
         self.net_worth = self.initial_balance
+        self.prev_networth = self.net_worth
         self.holding = 0
         self.current_set += 1
         if self.current_set >= self.total_sets:
@@ -46,6 +47,7 @@ class FXEnv(gym.Env):
         self.trades = []
 
         self.active_df = self.data[self.current_set][['Date', 'Open', 'High', 'Low', 'Close']]
+        self.active_df.reset_index(inplace=True)
 
         return self._next_observation()
     
@@ -59,7 +61,7 @@ class FXEnv(gym.Env):
         scale_df = pd.concat([
             prev_df.iloc[-(window_size - self.current_min):],
             self.active_df.iloc[:self.current_min]
-        ])
+        ], sort=False)
         scaler = preprocessing.MinMaxScaler()
         scaler.fit(scale_df[scaled_features])
         obs = scaler.transform(self.active_df[scaled_features].iloc[self.current_min].values.reshape(1, -1))
@@ -75,9 +77,18 @@ class FXEnv(gym.Env):
         self.mins_left -= 1
         self.current_min += 1
 
+        reward = self.net_worth - self.prev_networth
+        self.prev_networth = self.net_worth
+
         if self.mins_left == 0:
             # TODO Remember profits ?
             obs = self.reset()
+        else:
+            obs = self._next_observation()
+        
+        done = self.net_worth <= 0
+
+        return obs, reward, done, {}
     
     def _take_action(self, action, current_price):
         action_type = action[0]
@@ -114,7 +125,7 @@ class FXEnv(gym.Env):
             [cost],
             [sold],
             [sales]
-        ], axis=1)
+        ])
 
     def render(self, mode='live', title=None, **kwargs):
         if mode == 'file':
@@ -123,12 +134,25 @@ class FXEnv(gym.Env):
         elif mode == 'live':
             if self.visualization == None:
                 self.visualization = FXGraph(self.active_df, title)
+            else:
+                self.visualization.render(self.current_min, self.net_worth,
+                        self.trades)
                 
 
 
 
             
-
 env = FXEnv()
 env.reset()
 env.render()
+for i in range(500):
+    action1 = 2
+    if i < 40 and i > 10:
+        action1 = 0
+    elif i > 150:
+        action1 = 1
+    #action1 = np.random.randint(0, 2)
+    action2 = np.random.randint(1, 4)
+    obs, reward, done, _ = env.step([action1, action2])
+    print(reward)
+    env.render()
