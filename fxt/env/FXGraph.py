@@ -30,7 +30,7 @@ class FXGraph:
         plt.show(block=False)
 
     def render(self, current_step, net_worth, trades,
-            window_size = 120):
+            window_size = 60):
         
         self.net_worths[current_step] = net_worth
         window_start = max(current_step - window_size, 0)
