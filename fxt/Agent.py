@@ -44,7 +44,7 @@ class A2CAgent:
             if episode > 0 and episode % 10 == 0:
                 print("Episode:", episode, 'Reward', ep_rews[-1], 'losses', losses)
 
-            print(next_obs.shape)
+            print(ep_rews)
             _, next_value = self.model.action_value(next_obs.reshape(1, *self.state_size))
             returns, advantages = self._returns_advantages(rewards, dones, values, next_value)
             act_adv = np.concatenate((actions[:,None], advantages[:,None]), axis=-1)
@@ -75,6 +75,6 @@ class A2CAgent:
 
 model = FXModel(3)
 env = FXEnv()
-state_size = (60, 4)
+state_size = (60, 6)
 agent = A2CAgent(model, state_size, 3)
 rewards_history, losses = agent.train(env)

@@ -2,6 +2,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 from mpl_finance import candlestick_ochl as candlestick
+import random
 
 UP_COLOR = '#27A59A'
 DOWN_COLOR = '#EF534F'
@@ -12,8 +13,10 @@ class FXGraph:
         self.df = df
         self.net_worths = np.zeros(len(df))
 
-        fig = plt.figure()
-        fig.suptitle(title)
+        self.fig = plt.figure()
+        self.fig.suptitle(title)
+        self.baltext = None
+        self.holdtext = None
         
         self.net_worth_ax = plt.subplot2grid((5, 1), (0, 0),
                 rowspan=2, colspan=1)
@@ -23,13 +26,12 @@ class FXGraph:
 
         self.volume_ax = self.price_ax.twinx()
 
-        plt.subplots_adjust(left=0.11, bottom=0.15, right=0.90,
+        plt.subplots_adjust(left=0.11, bottom=0.11, right=0.80,
                 top=0.90, wspace=0.2, hspace=0)
-
 
         plt.show(block=False)
 
-    def render(self, current_step, net_worth, trades,
+    def render(self, current_step, net_worth, trades, balance, holding,
             window_size = 60):
         
         self.net_worths[current_step] = net_worth
@@ -42,6 +44,15 @@ class FXGraph:
                 step_range)
         self._render_price(current_step, step_range)
         self._render_trades(current_step, trades, step_range)
+
+        if self.baltext != None:
+            self.baltext.remove()
+            self.holdtext.remove()
+        holdval = holding * random.uniform(
+            self.df.loc[current_step, 'Open'],
+            self.df.loc[current_step, 'Close'])
+        self.baltext = self.fig.text(0.8, 0.8, "balance: " + str(balance), fontsize=9)
+        self.holdtext = self.fig.text(0.8, 0.6, "holding: " + str(holdval), fontsize=9)
 
         plt.pause(0.0001)
     
@@ -68,6 +79,7 @@ class FXGraph:
         
         self.net_worth_ax.set_ylim(min(self.net_worths[np.nonzero(self.net_worths)] / 1.01),
                 max(self.net_worths) * 1.01)
+
 
     def _render_price(self, current_step, step_range):
         self.price_ax.clear()
