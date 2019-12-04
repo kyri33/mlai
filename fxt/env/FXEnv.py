@@ -118,12 +118,15 @@ class FXEnv(gym.Env):
         sales = 0
 
         if action_type < 1:
-            bought = self.balance / current_price * amount
-            cost = bought * current_price * (1 + self.commission)
-            self.holding += bought
-            self.balance -= cost
+            #bought = self.balance / current_price * amount
+            if self.balance > 1000:
+                bought = 1000 / current_price
+                cost = bought * current_price * (1 + self.commission)
+                self.holding += bought
+                self.balance -= cost
         elif action_type < 2:
-            sold = self.holding * amount
+            #sold = self.holding * amount
+            sold = self.holding
             sales = sold * current_price * (1 - self.commission)
             self.holding -= sold
             self.balance += sales
