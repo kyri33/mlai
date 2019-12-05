@@ -154,6 +154,8 @@ class FXEnv(gym.Env):
         ]), axis=0)
 
     def render(self, mode='live', title=None, **kwargs):
+        if self.current_min >= 1440:
+            self.current_min = 1439
         if mode == 'file':
             # TODO print to file to watch later
             print("Print File TODO")
