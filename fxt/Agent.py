@@ -44,7 +44,7 @@ class A2CAgent:
             if episode > 0 and episode % 10 == 0:
                 print("Episode:", episode, 'Reward', ep_rews[-1], 'losses', losses)
 
-            print(ep_rews)
+            print(ep_rews[-1])
             _, next_value = self.model.action_value(next_obs.reshape(1, *self.state_size))
             returns, advantages = self._returns_advantages(rewards, dones, values, next_value)
             act_adv = np.concatenate((actions[:,None], advantages[:,None]), axis=-1)

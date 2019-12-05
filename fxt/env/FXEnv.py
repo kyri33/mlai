@@ -105,8 +105,8 @@ class FXEnv(gym.Env):
 
         if self.mins_left == 0:
             # TODO Remember profits ?
-            obs = self.reset()
             done = True
+            obs = np.zeros((60, 6))
         else:
             obs = self._next_observation()
             done = self.net_worth < self.initial_balance / 3
