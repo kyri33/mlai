@@ -19,7 +19,7 @@ class A2CAgent:
         self.action_size = action_size
         self.state_size = state_size
     
-    def train(self, env, episodes=10000):
+    def train(self, env, episodes=100000):
         batch_sz = 64
         observations = np.empty((batch_sz,) + self.state_size)
         actions = np.empty((batch_sz,), dtype=np.int32)
@@ -41,7 +41,7 @@ class A2CAgent:
                     ep_rews.append(0.0)
                     next_obs = env.reset()
                 
-            if episode > 0 and episode % 10 == 0:
+            if episode > 0 and episode % 100 == 0:
                 print("Episode:", episode, 'Reward', ep_rews[-1], 'losses', losses)
 
             print(len(ep_rews), "reward:", ep_rews[-1])
