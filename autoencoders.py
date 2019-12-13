@@ -17,6 +17,17 @@ input_size = x_train.shape[1]
 hidden_size = 128
 code_size = 32
 
+
+# SHALLOW AUTOENCODER
+input_shallow = Input(shape=(input_size,))
+code_shallow = Dense(code_size, activation='relu')(input_shallow)
+output_shallow = Dense(input_size)(code_shallow)
+model_shallow = Model(input_shallow, output_shallow)
+model_shallow.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+model_shallow.fit(x_train, x_train, epochs=5)
+
+# Deep Autoencoder
+
 input_img = Input(shape=(input_size,))
 hidden_1 = Dense(hidden_size, activation='relu')(input_img)
 code = Dense(code_size, activation='relu')(hidden_1)
@@ -24,5 +35,5 @@ hidden_2 = Dense(hidden_size, activation='relu')(code)
 output_img = Dense(input_size, activation='relu')(hidden_2)
 
 autoencoder = Model(input_img, output_img)
-autoencoder.compile(optimizer='adam', loss='binary_crossentropy')
+autoencoder.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
 autoencoder.fit(x_train, x_train, epochs=3)
