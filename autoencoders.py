@@ -66,7 +66,7 @@ autoencoder.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accu
 autoencoder.fit(x_train, x_train, epochs=5)
 
 plot_autoencoder_outputs(autoencoder, 5, (28, 28))
-'''
+
 # Denoising Autoencoder
 
 noise_factor = 0.4
@@ -135,3 +135,39 @@ for i in range(n):
         ax.set_title('Autoencoder Output')
 
 plt.show()
+
+'''
+
+class MyAutoencoder(Model):
+    def __init__(self):
+        super().__init__(MyAutoencoder)
+        input_size = x_train.shape[1]
+        hidden_size = 128
+        code_size = 32
+        
+        self.hidden1 = Dense(hidden_size, activation='relu')
+        self.code = Dense(code_size, activation='relu')
+        self.hidden2 = Dense(hidden_size, activation='relu')
+        self.os = Dense(input_size, activation='sigmoid')
+    
+    def encode(self, inputs):
+        x = tf.convert_to_tensor(inputs)
+        h = self.hidden1(x)
+        return self.code(h)
+
+    def decode(self, codes):
+        h = self.hidden2(codes)
+        return self.os(h)
+    
+    def call(self, inputs):
+        code = self.encode(inputs)
+        return self.decode(code)
+
+
+autoencoder = MyAutoencoder()
+autoencoder.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+autoencoder.fit(x_train, x_train, epochs=5)
+
+plot_autoencoder_outputs(autoencoder, 5, (28, 28))
+print(x_test[0].reshape(1, -1).shape)
+print(autoencoder.encode(x_test[0].reshape(1, -1)))
