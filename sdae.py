@@ -34,7 +34,7 @@ for i in tqdm(range(win_size + 1, len(df))):
             'MACD', 'MA', 'EMA', 'ATR', 'ROC']]
     scaler = MinMaxScaler()
     scaled_df = scaler.fit_transform(active_df)
-    data_set.append(active_df.iloc[-1])
+    data_set.append(scaled_df.iloc[-1])
 
 app = np.zeros((len(data_set), 3), dtype=np.float32)
 data_set = np.append(np.array(data_set), app, axis = 1)
@@ -67,10 +67,19 @@ class MyAutoencoder(Model):
         code = self.encode(inputs)
         return self.decode(code)
 
+
 model = MyAutoencoder()
 model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
 
 X_train, X_test, y_train, y_test = train_test_split(data_set, data_set, test_size=0.2)
 
-model.fit(X_train, X_train)
-model.score(X_test, X_test)
+m = 0.0
+std = 0.1
+train_noise = np.random.normal(m, std, size=X_train.shape)
+test_noise = np.random.normal(m, std, X_test.shape)
+
+X_train_noisy = X_train + train_noise
+X_test_noisy = X_test + test_noise
+print(X_train_noisy - X_train)
+
+model.fit(X_train_noisy, X_train, validation_data=(X_test_noisy, X_test), epochs=5)
