@@ -34,17 +34,20 @@ for i in tqdm(range(win_size + 1, len(df))):
             'MACD', 'MA', 'EMA', 'ATR', 'ROC']]
     scaler = MinMaxScaler()
     scaled_df = scaler.fit_transform(active_df)
-    data_set.append(scaled_df[-1])
+    data_set.append(active_df.iloc[-1])
 
-data_set = np.array(data_set)
+app = np.zeros((len(data_set), 3), dtype=np.float32)
+data_set = np.append(np.array(data_set), app, axis = 1)
+print(data_set.shape)
+print(data_set)
 print(data_set.shape[0] - len(df))
 
 class MyAutoencoder(Model):
     def __init__(self):
         super().__init__(MyAutoencoder)
-        input_size = x_train.shape[1]
-        hidden_size = 128
-        code_size = 32
+        input_size = data_set.shape[1]
+        hidden_size = 10
+        code_size = 16
         
         self.hidden1 = Dense(hidden_size, activation='relu')
         self.code = Dense(code_size, activation='relu')
@@ -63,3 +66,11 @@ class MyAutoencoder(Model):
     def call(self, inputs):
         code = self.encode(inputs)
         return self.decode(code)
+
+model = MyAutoencoder()
+model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+
+X_train, X_test, y_train, y_test = train_test_split(data_set, data_set, test_size=0.2)
+
+model.fit(X_train, X_train)
+model.score(X_test, X_test)
