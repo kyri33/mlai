@@ -24,7 +24,7 @@ df['EMA'] = ind_ema
 df['ATR'] = ind_atr
 df['ROC'] = ind_roc
 
-print(df)
+df = df.iloc[0:200000]
 win_size = 1440
 
 data_set = []
@@ -34,18 +34,19 @@ for i in tqdm(range(win_size + 1, len(df))):
             'MACD', 'MA', 'EMA', 'ATR', 'ROC']]
     scaler = MinMaxScaler()
     scaled_df = scaler.fit_transform(active_df)
-    data_set.append(scaled_df.iloc[-1])
+    data_set.append(scaled_df[-1])
 
-app = np.zeros((len(data_set), 3), dtype=np.float32)
+app = np.random.rand(len(data_set), 3)
 data_set = np.append(np.array(data_set), app, axis = 1)
 print(data_set.shape)
-print(data_set)
-print(data_set.shape[0] - len(df))
+
+#for i in range(100):
+#    print(data_set[i * 10: i * 10 + 11])
 
 class MyAutoencoder(Model):
     def __init__(self):
         super().__init__(MyAutoencoder)
-        input_size = data_set.shape[1]
+        input_size = 12
         hidden_size = 10
         code_size = 16
         
@@ -69,7 +70,8 @@ class MyAutoencoder(Model):
 
 
 model = MyAutoencoder()
-model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+adm = keras.optimizers.Adam(learning_rate=0.001)
+model.compile(optimizer=adm, loss='binary_crossentropy', metrics=['mae'])
 
 X_train, X_test, y_train, y_test = train_test_split(data_set, data_set, test_size=0.2)
 
@@ -80,6 +82,24 @@ test_noise = np.random.normal(m, std, X_test.shape)
 
 X_train_noisy = X_train + train_noise
 X_test_noisy = X_test + test_noise
-print(X_train_noisy - X_train)
 
-model.fit(X_train_noisy, X_train, validation_data=(X_test_noisy, X_test), epochs=5)
+model.fit(X_train_noisy, X_train, validation_data=(X_test, X_test), epochs=10)
+
+predicted = model.predict(X_test_noisy)
+
+print("err")
+for i in range(len(X_test[0:10])):
+    print(np.mean(np.abs(X_test[i] - predicted[i])))
+
+print("noise")
+for i in range(len(X_test[0:10])):
+    print(np.mean(np.abs(X_test[i] - X_test_noisy[i])))
+
+for i in range(10, 13):
+    print("original")
+    print(X_test[i])
+    encoded = model.encode(X_test[i].reshape(1, 12))
+    print("encoded")
+    print(encoded)
+    print("decoded")
+    print(model.decode(encoded))
