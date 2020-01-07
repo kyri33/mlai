@@ -25,7 +25,7 @@ df['ATR'] = ind_atr
 df['ROC'] = ind_roc
 
 df = df.iloc[0:200000]
-win_size = 1440
+win_size = 2880
 
 data_set = []
 
