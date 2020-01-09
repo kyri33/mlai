@@ -2,6 +2,7 @@ import gym
 from gym import spaces
 import fdata
 from sklearn import preprocessing
+import numpy as np
 
 class FXEnv(gym.Env):
 
@@ -31,6 +32,8 @@ class FXEnv(gym.Env):
         self.trades = []
         self.anchor = fdata.DAY * self.current_day
         self.step = self.anchor + self.current_min
+        self.prev_price = 0
+        self.prev_position = 0
 
         return self._next_observation()
 
@@ -41,8 +44,33 @@ class FXEnv(gym.Env):
         scaler = preprocessing.MinMaxScaler()
         scaler.fit(scale_df)
 
-        obs_df = self.data[self.step - self.look_back + 1 : self.step + 1]
+        obs_df = self.data.iloc[self.step - self.look_back + 1 : self.step + 1]
+        obs_df = scaler.transform(obs_df)
+
+    def step(self, action):
+        current_price = random.uniform(
+            self.data.loc[self.step, 'Open'],
+            self.data.loc[self.step, 'Close']
+        )
+        current_position = self._take_action(action, current_price)
+        self.mins_left -= 1
+        self.current_min += 1
+        self.step += 1
+        if self.prev_price == 0:
+            self.prev_price = current_price
         
+        # TODO ADD COMMISSION AND SLIPPAGE
+        reward = (current_price - self.prev_price) * self.prev_position - abs(current_position - self.prev_position)
+
+        if self.mins_left == 0:
+            done = True
+            obs = np.zeros((60, 12))
+        else:
+            obs = self._next_observation()
+            done = False
+        
+        return obs, reward, done, {}
+
     
 
 env = FXEnv()
