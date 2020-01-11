@@ -20,11 +20,11 @@ class FXEnv(gym.Env):
         self.observation_space = spaces.Box(low=0, high=1, shape=[self.look_back, 12])
         self.data = fdata.load_data()
         self.current_day = 0
+        self.position_amount = initial_balance * 0.2
 
     def reset(self):
         self.balance = self.initial_balance
         self.net_worth = self.initial_balance
-        self.current_position = 0
         self.holding = 0
         self.current_day += 1
         self.current_min = 0
@@ -33,6 +33,7 @@ class FXEnv(gym.Env):
         self.anchor = fdata.DAY * self.current_day
         self.step = self.anchor + self.current_min
         self.prev_price = 0
+        self.prev_action = 0
         self.prev_position = 0
 
         return self._next_observation()
@@ -61,6 +62,7 @@ class FXEnv(gym.Env):
         
         # TODO ADD COMMISSION AND SLIPPAGE
         reward = (current_price - self.prev_price) * self.prev_position - abs(current_position - self.prev_position)
+        self.prev_position = current_position
 
         if self.mins_left == 0:
             done = True
@@ -71,7 +73,36 @@ class FXEnv(gym.Env):
         
         return obs, reward, done, {}
 
+    def _take_action(self, action, current_price):
+        action = action - 3
+        bought = 0
+        sold = 0
+        shorted = 0
+        covered = 0
+        cost = 0
+        sales = 0
+
+        if action == self.prev_action:
+            return self.prev_position
+
+        if action > self.prev_action:
+            if self.prev_action < 0:
+                covered, sales += self._cover(current_price, action - self.prev_action)
+            if action > 0:
+
+            
     
+    def _cover(current_price, action_diff):
+        total = 0
+        units = 0
+        if -action_diff < self.prev_action:
+            units = self.prev_position
+            total = self.prev_position * current_price
+        else:
+            total = self.position_amount * action_diff
+            units = total / current_price
+        
+        return abs(units), total
 
 env = FXEnv()
 env.reset()
