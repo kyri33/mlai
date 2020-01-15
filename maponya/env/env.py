@@ -3,6 +3,7 @@ from gym import spaces
 import fdata
 from sklearn import preprocessing
 import numpy as np
+import random
 
 class FXEnv(gym.Env):
 
@@ -21,6 +22,10 @@ class FXEnv(gym.Env):
         self.data = fdata.load_data()
         self.current_day = 0
         self.position_amount = initial_balance * 0.2
+        self.initial_portfolio = self.position_amount * (self.action_space.n // 2)
+
+        self.pos_scaler = preprocessing.MinMaxScaler(feature_range=(-1, 1))
+        self.pos_scaler.fit(np.array([[-3], [3]]))
 
     def reset(self):
         self.balance = self.initial_balance
@@ -35,6 +40,8 @@ class FXEnv(gym.Env):
         self.prev_price = 0
         self.prev_action = 0
         self.prev_position = 0
+        self.returns = np.zeros((60))
+        self.private = np.zeros((60, 2))
 
         return self._next_observation()
 
@@ -47,6 +54,10 @@ class FXEnv(gym.Env):
 
         obs_df = self.data.iloc[self.step - self.look_back + 1 : self.step + 1]
         obs_df = scaler.transform(obs_df)
+
+        sharpe = np.mean(self.returns[-60:]) / np.std(self.returns[-60:])
+        pos = self.pos_scaler.transform(np.array([[self.prev_action]]))
+        self.private = np.append(self.private, np.array([[pos, sharpe]]))
 
     def step(self, action):
         action = action - 3
@@ -65,6 +76,8 @@ class FXEnv(gym.Env):
         # TODO ADD COMMISSION AND SLIPPAGE
         reward = (current_price - self.prev_price) * self.prev_position - abs(current_position - self.prev_position) * self.spread
         self.prev_position = current_position
+        profit = (self.net_worth + (self.initial_portfolio - self.initial_balance) - self.initial_portfolio) / self.initial_portfolio
+        self.returns = np.append(self.returns, profit)
 
         if self.mins_left == 0:
             done = True
