@@ -36,7 +36,7 @@ class FXEnv(gym.Env):
         self.mins_left = fdata.DAY
         self.trades = []
         self.anchor = fdata.DAY * self.current_day
-        self.step = self.anchor + self.current_min
+        self.cur_step = self.anchor + self.current_min
         self.prev_price = 0
         self.prev_action = 0
         self.prev_position = 0
@@ -47,12 +47,12 @@ class FXEnv(gym.Env):
 
     def _next_observation(self):
         window_size = self.group_by
-        scale_df = self.data[self.step - window_size + 1 : self.step + 1]
+        scale_df = self.data[self.cur_step - window_size + 1 : self.cur_step + 1]
         
         scaler = preprocessing.MinMaxScaler()
         scaler.fit(scale_df)
 
-        obs_df = self.data.iloc[self.step - self.look_back + 1 : self.step + 1]
+        obs_df = self.data.iloc[self.cur_step - self.look_back + 1 : self.cur_step + 1]
         obs_df = scaler.transform(obs_df)
 
         sharpe = np.mean(self.returns[-60:]) / np.std(self.returns[-60:])
@@ -62,14 +62,14 @@ class FXEnv(gym.Env):
     def step(self, action):
         action = action - 3
         current_price = random.uniform(
-            self.data.loc[self.step, 'Open'],
-            self.data.loc[self.step, 'Close']
+            self.data.loc[self.cur_step, 'Open'],
+            self.data.loc[self.cur_step, 'Close']
         )
         current_position = self._take_action(action, current_price)
         self.prev_action = action
         self.mins_left -= 1
         self.current_min += 1
-        self.step += 1
+        self.cur_step += 1
         if self.prev_price == 0:
             self.prev_price = current_price
         
