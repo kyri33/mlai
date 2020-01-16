@@ -14,4 +14,4 @@ def load_data():
     df['ROC'] = ta.momentum.roc(df['Close'], n=12, fillna=True)
     df['ICHI'] = ta.trend.ichimoku_a(df['High'], df['Low'], n1=9, n2=26, visual=False, fillna=True)
 
-    return df[['Open', 'High', 'Low', 'Close', 'MACD', 'MA', 'EMA', 'ATR', 'ROC']]
+    return df[['Open', 'High', 'Low', 'Close', 'MACD', 'MA', 'EMA', 'ATR', 'ROC', 'ICHI']]

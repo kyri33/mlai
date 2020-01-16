@@ -40,14 +40,14 @@ class FXEnv(gym.Env):
         self.prev_price = 0
         self.prev_action = 0
         self.prev_position = 0
-        self.returns = np.zeros((60))
-        self.private = np.zeros((60, 2))
+        self.returns = np.zeros((self.look_back))
+        self.private = np.zeros((self.look_back, 2))
 
         return self._next_observation()
 
     def _next_observation(self):
         window_size = self.group_by
-        scale_df = self.data[self.cur_step - window_size + 1 : self.cur_step + 1]
+        scale_df = self.data.iloc[self.cur_step - window_size + 1 : self.cur_step + 1]
         
         scaler = preprocessing.MinMaxScaler()
         scaler.fit(scale_df)
@@ -55,9 +55,23 @@ class FXEnv(gym.Env):
         obs_df = self.data.iloc[self.cur_step - self.look_back + 1 : self.cur_step + 1]
         obs_df = scaler.transform(obs_df)
 
-        sharpe = np.mean(self.returns[-60:]) / np.std(self.returns[-60:])
-        pos = self.pos_scaler.transform(np.array([[self.prev_action]]))
-        self.private = np.append(self.private, np.array([[pos, sharpe]]))
+        mn = np.mean(self.returns[-self.look_back:])
+        std = np.std(self.returns[-self.look_back:])
+        if std == 0:
+            sharpe = 0.
+        else:
+            sharpe = mn / std
+        pos = self.pos_scaler.transform(np.array([[self.prev_action]]))[0][0]
+
+        self.private = np.append(self.private[-self.look_back + 1:], np.array([[pos, sharpe]]), axis=0)
+        print (self.private.shape)
+        print(obs_df.shape)
+
+        obs = np.append(obs_df, self.private, axis=1)
+        print(obs.shape)
+        for line in obs:
+            print(line)
+        return obs
 
     def step(self, action):
         action = action - 3
@@ -81,7 +95,7 @@ class FXEnv(gym.Env):
 
         if self.mins_left == 0:
             done = True
-            obs = np.zeros((60, 12))
+            obs = np.zeros((self.look_back, 12))
         else:
             obs = self._next_observation()
             done = False
