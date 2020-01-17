@@ -52,8 +52,8 @@ class FXEnv(gym.Env):
         scaler = preprocessing.MinMaxScaler()
         scaler.fit(scale_df)
 
-        obs_df = self.data.iloc[self.cur_step - self.look_back + 1 : self.cur_step + 1]
-        obs_df = scaler.transform(obs_df)
+        obs_df = self.data.iloc[self.cur_step - self.look_back + 1 : self.cur_step + 1].values
+        #obs_df = scaler.transform(obs_df)
 
         mn = np.mean(self.returns[-self.look_back:])
         std = np.std(self.returns[-self.look_back:])
