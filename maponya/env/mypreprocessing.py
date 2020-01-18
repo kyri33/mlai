@@ -28,6 +28,7 @@ class CustomMinMaxScaler():
         return self.transform(arr)
 
 
+'''
 arr = np.array([
     [1,     2,      12,     1],
     [2,     9,      13,      2],
@@ -45,3 +46,4 @@ minmax = MinMaxScaler()
 minmax.fit(arr)
 arr2 = [[-1], [-2], [13], [15], [17]]
 print(minmax.transform(arr2))
+'''

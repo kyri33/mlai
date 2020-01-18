@@ -4,6 +4,8 @@ import fdata
 from sklearn import preprocessing
 import numpy as np
 import random
+import mypreprocessing
+import pandas as pd
 
 class FXEnv(gym.Env):
 
@@ -12,6 +14,7 @@ class FXEnv(gym.Env):
         
         super(FXEnv, self).__init__()
 
+        pd.options.mode.chained_assignment = None
         self.group_by = fdata.DAY
         self.look_back = look_back
         self.initial_balance = initial_balance
@@ -48,12 +51,17 @@ class FXEnv(gym.Env):
     def _next_observation(self):
         window_size = self.group_by
         scale_df = self.data.iloc[self.cur_step - window_size + 1 : self.cur_step + 1]
-        
-        scaler = preprocessing.MinMaxScaler()
-        scaler.fit(scale_df)
+        minmaxindex = ['Open', 'Close', 'High', 'Low', 'MA', 'EMA', 'ATR', 'ICHI']
+        customindex = ['MACD', 'ROC']
 
-        obs_df = self.data.iloc[self.cur_step - self.look_back + 1 : self.cur_step + 1].values
-        #obs_df = scaler.transform(obs_df)
+        scaler = preprocessing.MinMaxScaler()
+        scaler.fit(scale_df[minmaxindex])
+        myscaler = mypreprocessing.CustomMinMaxScaler()
+        myscaler.fit(scale_df[customindex].values)
+
+        obs_df = self.data.iloc[self.cur_step - self.look_back + 1 : self.cur_step + 1]
+        obs_df[minmaxindex] = scaler.transform(obs_df[minmaxindex])
+        obs_df[customindex] = myscaler.transform(obs_df[customindex].values)
 
         mn = np.mean(self.returns[-self.look_back:])
         std = np.std(self.returns[-self.look_back:])
@@ -64,13 +72,11 @@ class FXEnv(gym.Env):
         pos = self.pos_scaler.transform(np.array([[self.prev_action]]))[0][0]
 
         self.private = np.append(self.private[-self.look_back + 1:], np.array([[pos, sharpe]]), axis=0)
-        print (self.private.shape)
-        print(obs_df.shape)
+        sharpscaler = mypreprocessing.CustomMinMaxScaler()
+        self.private[:,1] = sharpscaler.fit_transform(self.private[:,1].reshape(-1, 1)).reshape(-1)
 
         obs = np.append(obs_df, self.private, axis=1)
-        print(obs.shape)
-        for line in obs:
-            print(line)
+        print(obs)
         return obs
 
     def step(self, action):
