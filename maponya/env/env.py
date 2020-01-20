@@ -6,6 +6,7 @@ import numpy as np
 import random
 import mypreprocessing
 import pandas as pd
+from graph import ENVGraph
 
 class FXEnv(gym.Env):
 
@@ -33,7 +34,6 @@ class FXEnv(gym.Env):
     def reset(self):
         self.balance = self.initial_balance
         self.net_worth = self.initial_balance
-        self.holding = 0
         self.current_day += 1
         self.current_min = 0
         self.mins_left = fdata.DAY
@@ -45,6 +45,8 @@ class FXEnv(gym.Env):
         self.prev_position = 0
         self.returns = np.zeros((self.look_back))
         self.private = np.zeros((self.look_back, 2))
+        self.trades = []
+        self.visualization = None
 
         return self._next_observation()
 
@@ -71,12 +73,11 @@ class FXEnv(gym.Env):
             sharpe = mn / std
         pos = self.pos_scaler.transform(np.array([[self.prev_action]]))[0][0]
 
-        self.private = np.append(self.private[-self.look_back + 1:], np.array([[pos, sharpe]]), axis=0)
+        self.private = np.append(self.private, np.array([[pos, sharpe]]), axis=0)
         sharpscaler = mypreprocessing.CustomMinMaxScaler()
         self.private[:,1] = sharpscaler.fit_transform(self.private[:,1].reshape(-1, 1)).reshape(-1)
 
-        obs = np.append(obs_df, self.private, axis=1)
-        print(obs)
+        obs = np.append(obs_df, self.private[-self.look_back:], axis=1)
         return obs
 
     def step(self, action):
@@ -87,6 +88,7 @@ class FXEnv(gym.Env):
         )
         current_position = self._take_action(action, current_price)
         self.prev_action = action
+        self.net_worth = self.balance + current_position * current_price
         self.mins_left -= 1
         self.current_min += 1
         self.cur_step += 1
@@ -96,6 +98,7 @@ class FXEnv(gym.Env):
         # TODO ADD COMMISSION AND SLIPPAGE
         reward = (current_price - self.prev_price) * self.prev_position - abs(current_position - self.prev_position) * self.spread
         self.prev_position = current_position
+        self.prev_price = current_price
         profit = (self.net_worth + (self.initial_portfolio - self.initial_balance) - self.initial_portfolio) / self.initial_portfolio
         self.returns = np.append(self.returns, profit)
 
@@ -134,7 +137,15 @@ class FXEnv(gym.Env):
         
         current_position = self.prev_position - shorted + covered - sold + bought
         self.balance = self.balance + sales - cost
-        self.net_worth = self.balance + self.prev_position * current_price
+
+        if sales > 0 or cost > 0:
+            self.trades.append({
+                'step': self.cur_step,
+                'amount': sold if sold > 0 else bought,
+                'total': sales if sales > 0 else cost,
+                'type': 'sell' if sales > 0 else 'buy'
+            })
+
         return current_position
 
     def _sell(self, current_price, action_diff):
@@ -170,7 +181,32 @@ class FXEnv(gym.Env):
         units = total / current_price
         return abs(units), abs(total)
 
+    def render(self, mode='live', title=None, **kwargs):
+        
+        if mode == 'file':
+            print("File TODO")
+        elif mode == 'live':
+            if self.visualization == None:
+                self.visualization = ENVGraph(self.data, title)
+            else:
+                self.visualization.render(self.cur_step, self.net_worth, 
+                        self.trades, self.balance, self.prev_position)
+
 
 
 env = FXEnv()
 env.reset()
+
+step = 3
+for k in range(200):
+    if k == 100:
+        step = 6
+    if k == 130:
+        step = 3
+    if k == 150:
+        step = 1
+    if k == 170:
+        step = 4
+    state, reward, _, _ = env.step(step)
+    print(state)
+    env.render()
