@@ -7,6 +7,7 @@ import random
 import mypreprocessing
 import pandas as pd
 from graph import ENVGraph
+import keyboard
 
 class FXEnv(gym.Env):
 
@@ -198,15 +199,22 @@ env = FXEnv()
 env.reset()
 
 step = 3
-for k in range(200):
-    if k == 100:
-        step = 6
-    if k == 130:
-        step = 3
-    if k == 150:
+for k in range(2000):
+    key = keyboard.read_key()
+    if key == '0':
+        step = 0
+    elif key == '1':
         step = 1
-    if k == 170:
+    elif key == '2':
+        step = 2
+    elif key == '3':
+        step = 3
+    elif key == '4':
         step = 4
+    elif key == '5':
+        step = 5
+    elif key == '6':
+        step = 6
     state, reward, _, _ = env.step(step)
     print(state)
     env.render()
