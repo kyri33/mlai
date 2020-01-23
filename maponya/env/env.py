@@ -7,7 +7,12 @@ import random
 import mypreprocessing
 import pandas as pd
 from graph import ENVGraph
+
 import keyboard
+
+from autoencoder import MyAutoencoder
+from random import randrange
+import tensorflow.keras as keras
 
 class FXEnv(gym.Env):
 
@@ -102,7 +107,6 @@ class FXEnv(gym.Env):
         reward = profit
         self.prev_position = current_position
         self.prev_price = current_price
-        print(profit)
         #profit = (self.net_worth + (self.initial_portfolio - self.initial_balance) - self.initial_portfolio) / self.initial_portfolio
         self.returns = np.append(self.returns, profit)
 
@@ -112,7 +116,6 @@ class FXEnv(gym.Env):
         else:
             obs = self._next_observation()
             done = False
-        print('position', self.prev_position)
         return obs, reward, done, {}
 
     def _take_action(self, action, current_price):
@@ -144,10 +147,6 @@ class FXEnv(gym.Env):
         
         sales += short_sales
         cost += cover_cost
-        print('covered', covered)
-        print('shorted', shorted)
-        print('sold', sold)
-        print('bought', bought)
         current_position = self.prev_position - shorted + covered - sold + bought
         self.balance = self.balance + sales - cost
 
@@ -212,7 +211,11 @@ env.reset()
 
 step = 3
 print('begun')
+encoder = MyAutoencoder()
+adm = keras.optimizers.Adam(learning_rate=0.0001)
+encoder.compile(optimizer=adm, loss='binary_crossentropy', metrics=['mae'])
 for k in range(2000):
+    '''
     key = keyboard.read_key()
     if key == '0':
         step = 0
@@ -228,6 +231,14 @@ for k in range(2000):
         step = 5
     elif key == '6':
         step = 6
-    state, reward, _, _ = env.step(step)
+    '''
+    step = randrange(6)
     #print(state)
-    env.render()
+    state, reward, _, _ = env.step(step)
+
+    m = 0.0
+    std = 0.1
+    noise = np.random.normal(m, std, size=state.shape)
+    state_noisy = state + noise
+    # env.render()
+    encoder.fit(state_noisy, state, batch_size=30, epochs=5)
