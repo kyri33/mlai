@@ -23,20 +23,21 @@ df['MA'] = ind_ma
 df['EMA'] = ind_ema
 df['ATR'] = ind_atr
 df['ROC'] = ind_roc
+df['ICHI'] = ta.trend.ichimoku_a(df['High'], df['Low'], n1=9, n2=26, visual=False, fillna=True)
 
-df = df.iloc[0:200000]
-win_size = 2880
+df = df.iloc[0:100000]
+win_size = 1440
 
 data_set = []
 
 for i in tqdm(range(win_size + 1, len(df))):
     active_df = df.loc[i -win_size : i, ['Open', 'High', 'Low', 'Close', 
-            'MACD', 'MA', 'EMA', 'ATR', 'ROC']]
+            'MACD', 'MA', 'EMA', 'ATR', 'ROC', 'ICHI']]
     scaler = MinMaxScaler()
     scaled_df = scaler.fit_transform(active_df)
     data_set.append(scaled_df[-1])
 
-app = np.random.rand(len(data_set), 3)
+app = np.random.rand(len(data_set), 2)
 data_set = np.append(np.array(data_set), app, axis = 1)
 print(data_set.shape)
 
@@ -83,7 +84,7 @@ test_noise = np.random.normal(m, std, X_test.shape)
 X_train_noisy = X_train + train_noise
 X_test_noisy = X_test + test_noise
 
-model.fit(X_train_noisy, X_train, validation_data=(X_test, X_test), epochs=10)
+model.fit(X_train_noisy, X_train, batch_size=1, validation_data=(X_test, X_test), epochs=10)
 
 predicted = model.predict(X_test_noisy)
 

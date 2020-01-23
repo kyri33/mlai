@@ -66,12 +66,13 @@ class FXEnv(gym.Env):
         obs_df[minmaxindex] = scaler.transform(obs_df[minmaxindex])
         obs_df[customindex] = myscaler.transform(obs_df[customindex].values)
 
-        mn = np.mean(self.returns[-self.look_back:])
-        std = np.std(self.returns[-self.look_back:])
+        mn = np.mean(self.returns)
+        std = np.std(self.returns)
         if std == 0:
             sharpe = 0.
         else:
             sharpe = mn / std
+
         pos = self.pos_scaler.transform(np.array([[self.prev_action]]))[0][0]
 
         self.private = np.append(self.private, np.array([[pos, sharpe]]), axis=0)
@@ -97,10 +98,12 @@ class FXEnv(gym.Env):
             self.prev_price = current_price
         
         # TODO ADD COMMISSION AND SLIPPAGE
-        reward = (current_price - self.prev_price) * self.prev_position - abs(current_position - self.prev_position) * self.spread
+        profit = (current_price - self.prev_price) * self.prev_position - abs(current_position - self.prev_position) * self.spread
+        reward = profit
         self.prev_position = current_position
         self.prev_price = current_price
-        profit = (self.net_worth + (self.initial_portfolio - self.initial_balance) - self.initial_portfolio) / self.initial_portfolio
+        print(profit)
+        #profit = (self.net_worth + (self.initial_portfolio - self.initial_balance) - self.initial_portfolio) / self.initial_portfolio
         self.returns = np.append(self.returns, profit)
 
         if self.mins_left == 0:
@@ -109,7 +112,7 @@ class FXEnv(gym.Env):
         else:
             obs = self._next_observation()
             done = False
-        
+        print('position', self.prev_position)
         return obs, reward, done, {}
 
     def _take_action(self, action, current_price):
@@ -117,25 +120,34 @@ class FXEnv(gym.Env):
         sold = 0
         shorted = 0
         covered = 0
+
         cost = 0
         sales = 0
+        short_sales = 0
+        cover_cost = 0
 
         if action == self.prev_action:
             return self.prev_position
 
         if action > self.prev_action:
             if self.prev_action < 0:
-                covered, cost = self._cover(current_price, action - self.prev_action)
+                covered, cover_cost = self._cover(current_price, action - self.prev_action)
                 action += self.prev_action
-            if action > 0:
+            if action >= 0:
                 bought, cost = self._long(current_price, action - self.prev_action)
         elif action < self.prev_action:
             if self.prev_action > 0:
                 sold, sales = self._sell(current_price, action - self.prev_action)
                 action += self.prev_action
-            if action < 0:
-                shorted, sales = self._short(current_price, action - self.prev_action)
+            if action <= 0:
+                shorted, short_sales = self._short(current_price, action - self.prev_action)
         
+        sales += short_sales
+        cost += cover_cost
+        print('covered', covered)
+        print('shorted', shorted)
+        print('sold', sold)
+        print('bought', bought)
         current_position = self.prev_position - shorted + covered - sold + bought
         self.balance = self.balance + sales - cost
 
@@ -199,6 +211,7 @@ env = FXEnv()
 env.reset()
 
 step = 3
+print('begun')
 for k in range(2000):
     key = keyboard.read_key()
     if key == '0':
@@ -216,5 +229,5 @@ for k in range(2000):
     elif key == '6':
         step = 6
     state, reward, _, _ = env.step(step)
-    print(state)
+    #print(state)
     env.render()
