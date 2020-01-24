@@ -13,7 +13,7 @@ class MyAutoencoder(Model):
         self.hidden1 = Dense(hidden_size, activation='relu')
         self.code = Dense(code_size, activation='relu')
         self.hidden2 = Dense(hidden_size, activation='relu')
-        self.os = Dense(input_size, activation='sigmoid')
+        self.os = Dense(input_size, activation='tanh')
     
     def encode(self, inputs):
         x = tf.convert_to_tensor(inputs)

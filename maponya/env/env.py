@@ -212,9 +212,9 @@ env.reset()
 step = 3
 print('begun')
 encoder = MyAutoencoder()
-adm = keras.optimizers.Adam(learning_rate=0.0001)
-encoder.compile(optimizer=adm, loss='binary_crossentropy', metrics=['mae'])
-for k in range(2000):
+adm = keras.optimizers.Adam(learning_rate=0.001)
+encoder.compile(optimizer=adm, loss='mse', metrics=['mae'])
+for k in range(10000):
     '''
     key = keyboard.read_key()
     if key == '0':
@@ -237,8 +237,8 @@ for k in range(2000):
     state, reward, _, _ = env.step(step)
 
     m = 0.0
-    std = 0.1
+    std = 0.2
     noise = np.random.normal(m, std, size=state.shape)
     state_noisy = state + noise
     # env.render()
-    encoder.fit(state_noisy, state, batch_size=30, epochs=5)
+    encoder.fit(state_noisy, state, batch_size=1, epochs=3)
