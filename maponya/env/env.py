@@ -1,18 +1,18 @@
 import gym
 from gym import spaces
-import fdata
+from env import fdata
 from sklearn import preprocessing
 import numpy as np
 import random
-import mypreprocessing
+from env import mypreprocessing
 import pandas as pd
-from graph import ENVGraph
+from env.graph import ENVGraph
 
-import keyboard
+#import keyboard
 
-from autoencoder import MyAutoencoder
-from random import randrange
-import tensorflow.keras as keras
+#from autoencoder import MyAutoencoder
+#from random import randrange
+#import tensorflow.keras as keras
 
 class FXEnv(gym.Env):
 
@@ -205,7 +205,7 @@ class FXEnv(gym.Env):
                         self.trades, self.balance, self.prev_position)
 
 
-
+'''
 env = FXEnv('gbpjpy')
 env2 = FXEnv('usdchf')
 test_env = FXEnv('')
@@ -219,7 +219,7 @@ encoder = MyAutoencoder()
 adm = keras.optimizers.Adam(learning_rate=0.001)
 encoder.compile(optimizer=adm, loss='mse', metrics=['mae'])
 for k in range(100000):
-    '''
+
     key = keyboard.read_key()
     if key == '0':
         step = 0
@@ -235,7 +235,6 @@ for k in range(100000):
         step = 5
     elif key == '6':
         step = 6
-    '''
     step = randrange(6)
     step2 = randrange(6)
     test_step = randrange(6)
@@ -252,5 +251,7 @@ for k in range(100000):
     state_noisy2 = state2 + noise2
 
     jstate = np.append(state_noisy[-1].reshape(1, -1), state_noisy2[-1].reshape(1, -1), axis=0)
+    nstate = np.append(state[-1].reshape(1, -1), state2[-1].reshape(1, -1), axis=0)
     print(k)
-    encoder.fit(jstate, jstate, batch_size=1, epochs=1, validation_data=(test_state, test_state))
+    encoder.fit(jstate, nstate, batch_size=1, epochs=1, validation_data=(test_state, test_state))
+'''

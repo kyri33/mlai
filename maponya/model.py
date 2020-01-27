@@ -25,9 +25,9 @@ class MyModel(keras.Model):
         x = tf.convert_to_tensor(inputs)
         
         h = self.h1(x)
-        h = self.h2(x)
-        h = self.h3(x)
-        h = self.h4(x)
+        h = self.h2(h)
+        h = self.h3(h)
+        h = self.h4(h)
 
         return self.logits(h), self.value(h)
 
