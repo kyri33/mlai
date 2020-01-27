@@ -3,8 +3,8 @@ import ta
 
 DAY = 1440
 
-def load_data():
-    df = pd.read_csv('../fxt/env/datasets/fx_usdchf_2018.csv', sep=';', 
+def load_data(pair):
+    df = pd.read_csv('../fxt/env/datasets/fx_' + pair + '_2018.csv', sep=';', 
         names=['Date', 'Open', 'High', 'Low', 'Close', 'Volume'])
 
     df['MACD'] = ta.trend.macd(df['Close'], n_slow=52, n_fast=25, fillna=True)
@@ -13,5 +13,9 @@ def load_data():
     df['ATR'] = ta.volatility.average_true_range(df['High'], df['Low'], df['Close'], n=14, fillna=True)
     df['ROC'] = ta.momentum.roc(df['Close'], n=12, fillna=True)
     df['ICHI'] = ta.trend.ichimoku_a(df['High'], df['Low'], n1=9, n2=26, visual=False, fillna=True)
-
-    return df[['Open', 'High', 'Low', 'Close', 'MACD', 'MA', 'EMA', 'ATR', 'ROC', 'ICHI']]
+    ret = df[['Open', 'High', 'Low', 'Close', 'MACD', 'MA', 'EMA', 'ATR', 'ROC', 'ICHI']]
+    '''if pair == 'usdchf':
+        ret = ret.iloc[1000:].reset_index()
+        del ret['index']
+        return ret'''
+    return ret

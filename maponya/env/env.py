@@ -16,7 +16,7 @@ import tensorflow.keras as keras
 
 class FXEnv(gym.Env):
 
-    def __init__(self, spread=0.0,
+    def __init__(self, pair, spread=0.0,
             initial_balance=10000, look_back=60):
         
         super(FXEnv, self).__init__()
@@ -29,7 +29,7 @@ class FXEnv(gym.Env):
         
         self.action_space = spaces.Discrete(7)
         self.observation_space = spaces.Box(low=0, high=1, shape=[self.look_back, 12])
-        self.data = fdata.load_data()
+        self.data = fdata.load_data(pair)
         self.current_day = 0
         self.position_amount = initial_balance * 0.2
         self.initial_portfolio = self.position_amount * (self.action_space.n // 2)
@@ -66,11 +66,11 @@ class FXEnv(gym.Env):
         scaler.fit(scale_df[minmaxindex])
         myscaler = mypreprocessing.CustomMinMaxScaler()
         myscaler.fit(scale_df[customindex].values)
-
-        obs_df = self.data.iloc[self.cur_step - self.look_back + 1 : self.cur_step + 1]
+        
+        obs_df = self.data.iloc[self.cur_step - self.look_back + 1 : self.cur_step + 1].copy()
         obs_df[minmaxindex] = scaler.transform(obs_df[minmaxindex])
         obs_df[customindex] = myscaler.transform(obs_df[customindex].values)
-
+        
         mn = np.mean(self.returns)
         std = np.std(self.returns)
         if std == 0:
@@ -85,6 +85,7 @@ class FXEnv(gym.Env):
         self.private[:,1] = sharpscaler.fit_transform(self.private[:,1].reshape(-1, 1)).reshape(-1)
 
         obs = np.append(obs_df, self.private[-self.look_back:], axis=1)
+        
         return obs
 
     def step(self, action):
@@ -109,7 +110,6 @@ class FXEnv(gym.Env):
         self.prev_price = current_price
         #profit = (self.net_worth + (self.initial_portfolio - self.initial_balance) - self.initial_portfolio) / self.initial_portfolio
         self.returns = np.append(self.returns, profit)
-
         if self.mins_left == 0:
             done = True
             obs = np.zeros((self.look_back, 12))
@@ -206,15 +206,19 @@ class FXEnv(gym.Env):
 
 
 
-env = FXEnv()
+env = FXEnv('gbpjpy')
+env2 = FXEnv('usdchf')
+test_env = FXEnv('')
 env.reset()
+env2.reset()
+test_env.reset()
 
 step = 3
 print('begun')
 encoder = MyAutoencoder()
 adm = keras.optimizers.Adam(learning_rate=0.001)
 encoder.compile(optimizer=adm, loss='mse', metrics=['mae'])
-for k in range(10000):
+for k in range(100000):
     '''
     key = keyboard.read_key()
     if key == '0':
@@ -233,12 +237,20 @@ for k in range(10000):
         step = 6
     '''
     step = randrange(6)
-    #print(state)
+    step2 = randrange(6)
+    test_step = randrange(6)
     state, reward, _, _ = env.step(step)
+    state2, r, _, _ = env2.step(step2)
+    test_state, r, _, _ = test_env.step(test_step)
 
     m = 0.0
-    std = 0.2
+    std = 0.1
     noise = np.random.normal(m, std, size=state.shape)
     state_noisy = state + noise
-    # env.render()
-    encoder.fit(state_noisy, state, batch_size=1, epochs=3)
+
+    noise2 = np.random.normal(m, std, size=state2.shape)
+    state_noisy2 = state2 + noise2
+
+    jstate = np.append(state_noisy[-1].reshape(1, -1), state_noisy2[-1].reshape(1, -1), axis=0)
+    print(k)
+    encoder.fit(jstate, jstate, batch_size=1, epochs=1, validation_data=(test_state, test_state))
