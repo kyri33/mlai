@@ -7,7 +7,8 @@ from env.env import FXEnv
 from model import MyModel
 
 class MyAgent:
-    def __init__(self, model, sdae, state_size, action_size, env):
+    def __init__(self, model, sdae, state_size, action_size, env, nm='0'):
+        self.nm = nm
         self.params = {
             'gamma': 0.99,
             'value': 0.5,
@@ -20,21 +21,22 @@ class MyAgent:
         self.env = env
         self.last_obs = env.reset()
 
-    def train(self):
+    def train(self, episode):
         batch_sz = 64
         observations = np.empty((batch_sz,) + self.state_size)
         actions = np.empty((batch_sz,), dtype=np.int32)
         rewards, dones, values = np.empty((3, batch_sz))
-
+        ep_reward = 0.0
         for step in range(batch_sz):
             self.sdae.noise_and_fit(self.last_obs[-1].reshape(1, -1))
 
             observations[step] = self.sdae.encode(self.last_obs.reshape(1, 60, 12))
-            print('shape', observations[step].shape)
             actions[step], values[step] = self.model.action_value(observations[step].reshape(1, *state_size))
             self.last_obs, rewards[step], dones[step], _ = self.env.step(actions[step])
             
-            self.env.render()
+            ep_reward += rewards[step]
+            if self.nm == '1':
+                self.env.render()
 
             if dones[step]:
                 self.last_obs = self.env.reset()
@@ -44,6 +46,8 @@ class MyAgent:
         returns, advantages = self._returns_advantages(rewards, dones, values, next_value)
         act_adv = np.concatenate((actions[:, None], advantages[:, None]), axis=-1)
         losses = self.model.train_on_batch(observations, [act_adv, returns])
+        print('agent', self.nm, 'episode', episode)
+        print('reward', ep_reward)
         print('loss', losses)
         
     def _returns_advantages(self, rewards, dones, values, next_value):
@@ -79,7 +83,7 @@ pairs = ['gbpjpy', 'usdchf']
 environments = []
 agents = []
 
-test_env = FXEnv('')
+test_env = FXEnv('eurusd')
 state_size = (60, 16)
 action_size = 7
 
@@ -92,8 +96,8 @@ sdae.compile(optimizer = ko.Adam(lr = 0.001), loss='mse')
 
 for i in range(len(pairs)):
     environments.append(FXEnv(pairs[i], spread=0.0006))
-    agents.append(MyAgent(model, sdae, state_size, action_size, environments[i]))
+    agents.append(MyAgent(model, sdae, state_size, action_size, environments[i], nm=str(i)))
 
 for i in range(1000):
     for agent in agents:
-        agent.train()
+        agent.train(i)

@@ -28,6 +28,7 @@ class FXEnv(gym.Env):
         self.spread = spread
         
         self.action_space = spaces.Discrete(7)
+        self.maxaction = 6
         self.observation_space = spaces.Box(low=0, high=1, shape=[self.look_back, 12])
         self.data = fdata.load_data(pair)
         self.current_day = 0
@@ -36,11 +37,14 @@ class FXEnv(gym.Env):
 
         self.pos_scaler = preprocessing.MinMaxScaler(feature_range=(-1, 1))
         self.pos_scaler.fit(np.array([[-3], [3]]))
+        self.totalDays = len(self.data) // fdata.DAY
 
     def reset(self):
         self.balance = self.initial_balance
         self.net_worth = self.initial_balance
         self.current_day += 1
+        if self.current_day >= self.totalDays:
+            self.current_day = 1 
         self.current_min = 0
         self.mins_left = fdata.DAY
         self.trades = []
@@ -104,7 +108,7 @@ class FXEnv(gym.Env):
             self.prev_price = current_price
         
         # TODO ADD COMMISSION AND SLIPPAGE
-        profit = (current_price - self.prev_price) * self.prev_position - abs(current_position - self.prev_position) * self.spread
+        profit = (current_price - self.prev_price) * self.prev_position# - abs(current_position - self.prev_position) * self.spread
         reward = profit
         self.prev_position = current_position
         self.prev_price = current_price
@@ -128,6 +132,9 @@ class FXEnv(gym.Env):
         sales = 0
         short_sales = 0
         cover_cost = 0
+
+        if self.net_worth <= (self.maxaction - 3) * self.position_amount:
+            self.balance = self.initial_balance
 
         if action == self.prev_action:
             return self.prev_position
