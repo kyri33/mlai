@@ -35,8 +35,8 @@ class MyAgent:
             self.last_obs, rewards[step], dones[step], _ = self.env.step(actions[step])
             
             ep_reward += rewards[step]
-            if self.nm == '1':
-                self.env.render()
+            #if self.nm == '1':
+                #self.env.render()
 
             if dones[step]:
                 self.last_obs = self.env.reset()
@@ -49,6 +49,10 @@ class MyAgent:
         print('agent', self.nm, 'episode', episode)
         print('reward', ep_reward)
         print('loss', losses)
+
+        if episode % 100 == 0 and episode != 0:
+            self.model.save_weights('./weights/model')
+            self.sdae.save_weights('./weights/sdae')
         
     def _returns_advantages(self, rewards, dones, values, next_value):
         returns = np.append(np.zeros_like(rewards), next_value)
@@ -79,7 +83,8 @@ params = {
             'value': 0.5,
             'entropy': 0.0001
         }
-pairs = ['gbpjpy', 'usdchf']
+
+pairs = [{'pair': 'gbpjpy', 'spread': 0.03}, {'pair': 'usdchf', 'spread': 0.0002}]
 environments = []
 agents = []
 
@@ -95,7 +100,7 @@ model.compile(optimizer = ko.Adam(lr=0.0001),
 sdae.compile(optimizer = ko.Adam(lr = 0.001), loss='mse')
 
 for i in range(len(pairs)):
-    environments.append(FXEnv(pairs[i], spread=0.0006))
+    environments.append(FXEnv(pairs[i]['pair'], spread=pairs[i]['spread']))
     agents.append(MyAgent(model, sdae, state_size, action_size, environments[i], nm=str(i)))
 
 for i in range(1000):
