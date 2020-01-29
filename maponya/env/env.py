@@ -108,8 +108,8 @@ class FXEnv(gym.Env):
             self.prev_price = current_price
         
         # TODO ADD COMMISSION AND SLIPPAGE
-        profit = (current_price - self.prev_price) * self.prev_position - abs(current_position - self.prev_position) * self.spread
-        reward = profit
+        profit = (current_price - self.prev_price) * self.prev_position
+        reward = profit - abs(current_position - self.prev_position) * self.spread
         self.prev_position = current_position
         self.prev_price = current_price
         #profit = (self.net_worth + (self.initial_portfolio - self.initial_balance) - self.initial_portfolio) / self.initial_portfolio

@@ -6,6 +6,10 @@ from autoencoder import MyAutoencoder
 from env.env import FXEnv
 from model import MyModel
 
+from pympler import tracker
+from pympler import muppy
+from pympler import summary
+
 class MyAgent:
     def __init__(self, model, sdae, state_size, action_size, env, nm='0'):
         self.nm = nm
@@ -46,9 +50,12 @@ class MyAgent:
         returns, advantages = self._returns_advantages(rewards, dones, values, next_value)
         act_adv = np.concatenate((actions[:, None], advantages[:, None]), axis=-1)
         losses = self.model.train_on_batch(observations, [act_adv, returns])
+        
+        '''
         print('agent', self.nm, 'episode', episode)
         print('reward', ep_reward)
         print('loss', losses)
+        '''
 
         if episode % 100 == 0 and episode != 0:
             self.model.save_weights('./weights/model')
@@ -77,7 +84,6 @@ def logits_loss(act_adv, logits):
 
     return policy_loss - entropy_loss * params['entropy']
 
-
 params = {
             'gamma': 0.99,
             'value': 0.5,
@@ -103,6 +109,12 @@ for i in range(len(pairs)):
     environments.append(FXEnv(pairs[i]['pair'], spread=pairs[i]['spread']))
     agents.append(MyAgent(model, sdae, state_size, action_size, environments[i], nm=str(i)))
 
+tr = tracker.SummaryTracker()
 for i in range(200000):
     for agent in agents:
         agent.train(i)
+    print('episode', i)
+    all_objects = muppy.get_objects()
+    summary.print_(summary.summarize(all_objects))
+    tr.print_diff()
+    #print(mem_top())
