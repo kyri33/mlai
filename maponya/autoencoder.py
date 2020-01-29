@@ -34,4 +34,5 @@ class MyAutoencoder(Model):
         std = 0.1
         noise = np.random.normal(m, std, inputs.shape)
         x_noise = inputs + noise
-        self.fit(x_noise, inputs, batch_size=1, epochs=1, verbose=0)
+        self.train_on_batch(x_noise, inputs)
+        #self.fit(x_noise, inputs, batch_size=1, epochs=1, verbose=0)
