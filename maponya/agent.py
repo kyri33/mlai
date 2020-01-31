@@ -94,11 +94,12 @@ params = {
             'entropy': 0.0001
         }
 
-pairs = [{'pair': 'gbpjpy', 'spread': 0.03}, {'pair': 'usdchf', 'spread': 0.0002}]
+pairs = [{'pair': 'gbpjpy', 'spread': 0.03}, {'pair': 'usdchf', 'spread': 0.0002},
+                {'pair': 'eurusd', 'spread': 0.0001}, {'pair': 'gbpusd', 'spread': 0.00016}]
 environments = []
 agents = []
 
-test_env = FXEnv('eurusd')
+#test_env = FXEnv('eurusd')
 state_size = (60, 16)
 action_size = 7
 

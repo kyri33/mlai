@@ -26,11 +26,15 @@ class FXEnv(gym.Env):
         self.look_back = look_back
         self.initial_balance = initial_balance
         self.spread = spread
+
+        self.year = 2011
+        self.maxyear = 2018
         
         self.action_space = spaces.Discrete(7)
         self.maxaction = 6
         self.observation_space = spaces.Box(low=0, high=1, shape=[self.look_back, 12])
-        self.data = fdata.load_data(pair)
+        self.pair = pair
+        self.data = fdata.load_data(self.pair, self.year)
         self.current_day = 0
         self.position_amount = initial_balance * 0.2
         self.initial_portfolio = self.position_amount * (self.action_space.n // 2)
@@ -44,7 +48,12 @@ class FXEnv(gym.Env):
         self.net_worth = self.initial_balance
         self.current_day += 1
         if self.current_day >= self.totalDays:
-            self.current_day = 1 
+            self.current_day = 1
+            self.year += 1
+            if self.year > self.maxyear:
+                self.year = 2011
+            self.data = fdata.load_data(self.pair, self.year)
+
         self.current_min = 0
         self.mins_left = fdata.DAY
         self.trades = []

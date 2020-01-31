@@ -3,8 +3,8 @@ import ta
 
 DAY = 1440
 
-def load_data(pair):
-    df = pd.read_csv('../fxt/env/datasets/fx_' + pair + '_2018.csv', sep=';', 
+def load_data(pair, year):
+    df = pd.read_csv('../fxt/env/datasets/' + pair + '/fx_' + pair + '_' + str(year) + '.csv', sep=';', 
         names=['Date', 'Open', 'High', 'Low', 'Close', 'Volume'])
 
     df['MACD'] = ta.trend.macd(df['Close'], n_slow=52, n_fast=25, fillna=True)
