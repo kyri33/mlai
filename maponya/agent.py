@@ -114,6 +114,21 @@ for i in range(len(pairs)):
     environments.append(FXEnv(pairs[i]['pair'], spread=pairs[i]['spread']))
     agents.append(MyAgent(model, sdae, state_size, action_size, environments[i], nm=str(i)))
 
-for i in range(200000):
-    for agent in agents:
-        agent.train(i)
+training = False
+
+if training:
+    for i in range(200000):
+        for agent in agents:
+            agent.train(i)
+else:
+    model.load_weights('../../play/weights/model')
+    sdae.load_weights('../../play/weights/sdae')
+    env = environments[2]
+    obs = env.reset()
+    for i in range(1000):
+        obs = sdae.encode(obs.reshape(1, 60, 12))
+        action, _ = model.action_value(obs)
+        obs, re, done, _ = env.step(action)
+        env.render()
+
+
