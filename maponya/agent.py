@@ -94,8 +94,11 @@ params = {
             'entropy': 0.0001
         }
 
-pairs = [{'pair': 'gbpjpy', 'spread': 0.03}, {'pair': 'usdchf', 'spread': 0.0002},
-                {'pair': 'eurusd', 'spread': 0.0001}, {'pair': 'gbpusd', 'spread': 0.00016}]
+#pairs = [{'pair': 'gbpjpy', 'spread': 0.03}, {'pair': 'usdchf', 'spread': 0.0002},
+#                {'pair': 'eurusd', 'spread': 0.0001}, {'pair': 'gbpusd', 'spread': 0.00016}]
+
+pairs = [{'pair': 'eurusd', 'spread': 0.0001}, {'pair': 'gbpusd', 'spread': 0.0001}]
+
 environments = []
 agents = []
 
@@ -114,7 +117,7 @@ for i in range(len(pairs)):
     environments.append(FXEnv(pairs[i]['pair'], spread=pairs[i]['spread']))
     agents.append(MyAgent(model, sdae, state_size, action_size, environments[i], nm=str(i)))
 
-training = False
+training = True
 
 if training:
     for i in range(200000):
