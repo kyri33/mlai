@@ -29,7 +29,7 @@ class MyAgent:
         self.last_obs = env.reset()
 
     def train(self, episode):
-        batch_sz = 64
+        batch_sz = 16
         observations = np.empty((batch_sz,) + self.state_size)
         actions = np.empty((batch_sz,), dtype=np.int32)
         rewards, dones, values = np.empty((3, batch_sz))
