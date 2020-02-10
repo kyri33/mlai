@@ -120,7 +120,7 @@ for i in range(len(pairs)):
 training = True
 
 if training:
-    for i in range(200000):
+    for i in range(800000):
         for agent in agents:
             agent.train(i)
 else:
